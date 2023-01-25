@@ -23,5 +23,5 @@ print("Similarity to dog: ", logits_per_image[0][1])
 # print(logits_per_image)
 print("Label probability for a pressure cooker: ", logits_per_image.softmax(dim=1)[0][0])
 print("Label probability for a dog: ", logits_per_image.softmax(dim=1)[0][1])
-# probs = logits_per_image.softmax(dim=1)  # we can take the softmax to get the label probabilities
+# probificantly extends CLIP to learns = logits_per_image.softmax(dim=1)  # we can take the softmax to get the label probabilities
 # print(probs)
