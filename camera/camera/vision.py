@@ -53,7 +53,7 @@ class CLIP():
         self.model.to(self.device)
         self.patch_size = 64
         self.window_size = 3
-        self.threshold = 0.8
+        self.threshold = 0.95
         self.color_img = color_image
     
     def get_patches(self):
@@ -241,7 +241,7 @@ class Vision(Node):
         # initialize a CLIP model
         clip_model = CLIP(color_tensor)
         # declare prompts
-        prompts = ["a keyboard", "a water bottle", "a balloon"]# , "a computer mouse"] , "a keyboard", "a balloon"]
+        prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         bounding_boxes = clip_model.detect(prompts)
         # log the bounding boxes
         for box in bounding_boxes:

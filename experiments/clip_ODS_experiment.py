@@ -6,7 +6,7 @@ from transformers import CLIPProcessor, CLIPModel
 import numpy as np
 import matplotlib.patches
 
-image = Image.open("./images/example1.jpg")
+image = Image.open("./images/table1.png")
 # convert image to PyTorch tensor using torchvision.transforms
 image = transforms.ToTensor()(image) # image shape [3, 401, 604]
 
@@ -33,7 +33,7 @@ scores = torch.zeros(patches.shape[1], patches.shape[2])
 runs = torch.ones(patches.shape[1], patches.shape[2])
 
 # prompt = "A photo of a fried egg"
-prompt = "A photo of a fry pan"
+prompt = "an eggplant"
 
 # window slides from top to bottom
 for Y in range(0, patches.shape[1]-window+1, stride):
@@ -87,7 +87,7 @@ adj_patches = adj_patches * scores
 # rotate patches to visualize
 adj_patches = adj_patches.permute(3, 4, 2, 0, 1)
 
-"""
+
 Y = adj_patches.shape[0]
 X = adj_patches.shape[1]
 
@@ -99,6 +99,7 @@ for y in range(Y):
         ax[y, x].set_aspect('equal')
 plt.subplots_adjust(wspace=0, hspace=0)
 plt.show()
+
 """
 
 # scores higher than 0.5 are positive
@@ -137,3 +138,4 @@ rect = matplotlib.patches.Rectangle(
 ax.add_patch(rect)
 
 plt.show()
+"""
