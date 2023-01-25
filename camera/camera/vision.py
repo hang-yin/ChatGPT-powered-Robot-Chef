@@ -18,7 +18,6 @@ from tqdm.auto import tqdm
 import matplotlib.patches
 import matplotlib.pyplot as plt
 import torch
-from PIL import Image
 from torchvision import transforms
 from transformers import CLIPProcessor, CLIPModel
 
@@ -27,12 +26,26 @@ class State(Enum):
     IDLE = auto()
     SCANNING = auto()
 
+
+class BoundingBox():
+    """A bounding box for an object."""
+    def __init__(self, x, y, w, h, prompt):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.prompt = prompt
+    
+    def get_attributes(self):
+        return self.x, self.y, self.w, self.h, self.prompt
+
+
 class CLIP():
     """
     TODO: Add class docstring
     """
 
-    def __init__(self):
+    def __init__(self, color_image):
         # CLIP related parameters
         self.clip_processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
         self.clip_model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
@@ -40,11 +53,12 @@ class CLIP():
         self.clip_model.to(self.device)
         self.patch_size = 32
         self.window_size = 3
-        self.clip_threshold = 0.8
+        self.threshold = 0.8
+        self.color_img = color_image
     
-    def get_patches(self, img):
+    def get_patches(self):
         # add extra dimension for later calculations
-        img_patches = img.data.unfold(0,3,3)
+        img_patches = self.color_img.data.unfold(0,3,3)
         # break the image into patches (in height dimension)
         img_patches = img_patches.unfold(1, self.patch_size, self.patch_size)
         # break the image into patches (in width dimension)
@@ -102,18 +116,21 @@ class CLIP():
         width = x_max - x_min
         return x_min, y_min, width, height
     
-    def detect(self, prompts, img, stride=1):
+    def detect(self, prompts, stride=1):
         # build image patches for detection
-        img_patches = self.get_patches(img, self.patch_size)
+        img_patches = self.get_patches(self.color_img, self.patch_size)
         # convert image to format for displaying with matplotlib
-        image = np.moveaxis(img.data.numpy(), 0, -1)
+        image = np.moveaxis(self.color_img.data.numpy(), 0, -1)
         # initialize plot to display image + bounding boxes
         # fig, ax = plt.subplots(figsize=(Y*0.5, X*0.5))
         # ax.imshow(image)
+        # return a list of x, y, width, height, and prompt for each bounding box
+        boxes = []
         # process image through object detection steps
         for i, prompt in enumerate(tqdm(prompts)):
             scores = self.get_scores(img_patches, prompt, self.window_size, stride)
             x, y, width, height = self.get_box(scores, self.patch_size, self.threshold)
+            boxes.append(BoundingBox(x, y, width, height, prompt))
             """
             # create the bounding box
             rect = matplotlib.patches.Rectangle((x, y), width, height, linewidth=3, edgecolor=colors[i], facecolor='none')
@@ -123,6 +140,8 @@ class CLIP():
             ax.add_patch(rect)
             """
         # plt.show()
+        return boxes
+
 
 class Vision(Node):
     """
@@ -153,11 +172,14 @@ class Vision(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # set current state
-        self.state = State.IDLE
+        self.state = State.SCANNING
 
         # initialize color and depth images
         self.color = None
         self.depth = None
+
+        # initialize intrinsics
+        self.intrinsics = None
 
 
     def info_callback(self, cameraInfo):
@@ -199,13 +221,26 @@ class Vision(Node):
     
     def scan(self):
         # take self.color to do CLIP
-        # 
+        # convert self.color to a tensor of shape [3, height, width]
+        color_tensor = torch.tensor(self.color).permute(2, 0, 1).unsqueeze(0).float()
+        # get rid of the first dimension of color_tensor
+        color_tensor = color_tensor.squeeze(0)
+        # log the shape of the color tensor
+        # self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
+        # initialize a CLIP model
+        clip_model = CLIP()
+        # declare prompts
+        prompts = ["a laptop", "a computer mouse", "a keyboard", "a balloon"]
+        bounding_boxes = self.detect(prompts)
 
     def timer_callback(self):
         if self.state == State.IDLE:
             return
         elif self.state == State.SCANNING:
+            if self.color is None or self.depth is None:
+                return
             self.scan()
+            self.state = State.IDLE
 
 def main(args=None):
     """Start and spin the node."""
