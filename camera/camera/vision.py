@@ -181,6 +181,9 @@ class Vision(Node):
         # initialize intrinsics
         self.intrinsics = None
 
+        self.window = "Bounding boxes on color image"
+        cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
+
 
     def info_callback(self, cameraInfo):
         """Store the intrinsics of the camera."""
@@ -219,10 +222,17 @@ class Vision(Node):
             self.get_logger().info("Getting depth image failed?")
             return
     
+    def draw_bounding_boxes(self, boxes):
+        """Draw bounding boxes on the color image using cv2"""
+        for box in boxes:
+            x, y, width, height, prompt = box.get_attributes()
+            cv2.rectangle(self.color, (x, y), (x + width, y + height), (0, 255, 0), 2)
+            cv2.putText(self.color, prompt, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
+        
+
     def scan(self):
         # take self.color to do CLIP
         # convert self.color to a tensor of shape [3, height, width]
-        self.get_logger().info("I'm here 1")
         color_tensor = torch.tensor(self.color).permute(2, 0, 1).unsqueeze(0).float()
         # get rid of the first dimension of color_tensor
         color_tensor = color_tensor.squeeze(0)
@@ -231,15 +241,16 @@ class Vision(Node):
         # initialize a CLIP model
         clip_model = CLIP(color_tensor)
         # declare prompts
-        prompts = ["a laptop", "a computer mouse", "a keyboard", "a balloon"]
-        self.get_logger().info("I'm here 2")
+        prompts = ["a keyboard", "a water bottle", "a balloon"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         bounding_boxes = clip_model.detect(prompts)
-        self.get_logger().info("I'm here 3")
         # log the bounding boxes
         for box in bounding_boxes:
             x, y, width, height, prompt = box.get_attributes()
             self.get_logger().info(f"x: {x}, y: {y}, width: {width}, height: {height}, prompt: {prompt}")
-        self.get_logger().info("I'm here 4")
+        # show the color image with bounding boxes
+        self.draw_bounding_boxes(bounding_boxes)
+        cv2.imshow(self.window, self.color)
+        cv2.waitKey(0)
 
     def timer_callback(self):
         # log state
