@@ -27,7 +27,31 @@ class Vision(Node):
     """
 
     def __init__(self):
-        pass
+        super().__init__('vision')
+        # set timer frequency
+        self.frequency = 60
+        self.timer = self.create_timer(1 / self.frequency, self.timer_callback)
+        # create subscriptions to camera color, camera depth, camera aligned color and depth
+        self.color_sub = self.create_subscription(Image,
+                                                  '/camera/color/image_raw',
+                                                  self.color_callback,
+                                                  10)
+        self.depth_sub = self.create_subscription(Image,
+                                                  '/camera/aligned_depth_to_color/image_raw',
+                                                  self.depth_callback,
+                                                  10)
+        self.info_sub = self.create_subscription(CameraInfo,
+                                                 '/camera/aligned_depth_to_color/camera_info',
+                                                 self.info_callback,
+                                                 10)
+        # create cv bridge
+        self.bridge = CvBridge()
+        # initialize transform broadcaster
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        # set current state
+        self.state = State.IDLE
+
 
     def info_callback(self, cameraInfo):
         """Store the intrinsics of the camera."""
@@ -48,6 +72,22 @@ class Vision(Node):
             self.intrinsics.coeffs = [i for i in cameraInfo.d]
         except CvBridgeError:
             self.get_logger().info("Getting intrinsics failed?")
+            return
+    
+    def color_callback(self, color):
+        """Store the color image."""
+        try:
+            self.color = self.bridge.imgmsg_to_cv2(color, "bgr8")
+        except CvBridgeError:
+            self.get_logger().info("Getting color image failed?")
+            return
+    
+    def depth_callback(self, depth):
+        """Store the depth image."""
+        try:
+            self.depth = self.bridge.imgmsg_to_cv2(depth, "passthrough")
+        except CvBridgeError:
+            self.get_logger().info("Getting depth image failed?")
             return
     
     def timer_callback(self):
