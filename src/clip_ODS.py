@@ -107,4 +107,4 @@ if __name__ == "__main__":
     # item_list = ["an orange", "a banana", "an apple", "an eggplant", "a kiwi", "green beans", "a strawberry", "yellow pepper", "a corn", "a carrot"]
     # item_list = ["an orange", "a banana", "an apple"]
     item_list = ["a fry pan toy", "beans toy", "an egg toy"] 
-    detect(item_list, image, patch_size=32, window=3, stride=1, threshold=0.8)
+    detect(item_list, image, patch_size=32, window=3, stride=1, threshold=0.5)

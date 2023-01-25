@@ -6,7 +6,7 @@ from transformers import CLIPProcessor, CLIPModel
 import numpy as np
 import matplotlib.patches
 
-image = Image.open("./example2.jpg")
+image = Image.open("./example1.jpg")
 # convert image to PyTorch tensor using torchvision.transforms
 image = transforms.ToTensor()(image) # image shape [3, 401, 604]
 
@@ -32,7 +32,8 @@ stride = 1
 scores = torch.zeros(patches.shape[1], patches.shape[2])
 runs = torch.ones(patches.shape[1], patches.shape[2])
 
-prompt = "A photo of an orange"
+# prompt = "A photo of a fried egg"
+prompt = "A photo of a fry pan"
 
 # window slides from top to bottom
 for Y in range(0, patches.shape[1]-window+1, stride):
