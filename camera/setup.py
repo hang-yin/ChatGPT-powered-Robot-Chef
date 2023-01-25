@@ -6,6 +6,7 @@ setup(
     name=package_name,
     version='0.0.0',
     packages=[package_name],
+    # TODO: add files here
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -15,9 +16,10 @@ setup(
     zip_safe=True,
     maintainer='yh6917',
     maintainer_email='yinhang0226@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='Vision package for running CLIP object detection',
+    license='MIT',
     tests_require=['pytest'],
+    # TODO: add entry points here
     entry_points={
         'console_scripts': [
         ],
