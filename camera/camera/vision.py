@@ -47,11 +47,11 @@ class CLIP():
 
     def __init__(self, color_image):
         # CLIP related parameters
-        self.clip_processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
-        self.clip_model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
+        self.processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
+        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.clip_model.to(self.device)
-        self.patch_size = 32
+        self.model.to(self.device)
+        self.patch_size = 64
         self.window_size = 3
         self.threshold = 0.8
         self.color_img = color_image
@@ -118,7 +118,7 @@ class CLIP():
     
     def detect(self, prompts, stride=1):
         # build image patches for detection
-        img_patches = self.get_patches(self.color_img, self.patch_size)
+        img_patches = self.get_patches()
         # convert image to format for displaying with matplotlib
         image = np.moveaxis(self.color_img.data.numpy(), 0, -1)
         # initialize plot to display image + bounding boxes
@@ -128,8 +128,8 @@ class CLIP():
         boxes = []
         # process image through object detection steps
         for i, prompt in enumerate(tqdm(prompts)):
-            scores = self.get_scores(img_patches, prompt, self.window_size, stride)
-            x, y, width, height = self.get_box(scores, self.patch_size, self.threshold)
+            scores = self.get_scores(img_patches, prompt)
+            x, y, width, height = self.get_box(scores)
             boxes.append(BoundingBox(x, y, width, height, prompt))
             """
             # create the bounding box
@@ -151,7 +151,7 @@ class Vision(Node):
     def __init__(self):
         super().__init__('vision')
         # set timer frequency
-        self.frequency = 60
+        self.frequency = 10
         self.timer = self.create_timer(1 / self.frequency, self.timer_callback)
         # create subscriptions to camera color, camera depth, camera aligned color and depth
         self.color_sub = self.create_subscription(Image,
@@ -222,18 +222,28 @@ class Vision(Node):
     def scan(self):
         # take self.color to do CLIP
         # convert self.color to a tensor of shape [3, height, width]
+        self.get_logger().info("I'm here 1")
         color_tensor = torch.tensor(self.color).permute(2, 0, 1).unsqueeze(0).float()
         # get rid of the first dimension of color_tensor
         color_tensor = color_tensor.squeeze(0)
         # log the shape of the color tensor
         # self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
         # initialize a CLIP model
-        clip_model = CLIP()
+        clip_model = CLIP(color_tensor)
         # declare prompts
         prompts = ["a laptop", "a computer mouse", "a keyboard", "a balloon"]
-        bounding_boxes = self.detect(prompts)
+        self.get_logger().info("I'm here 2")
+        bounding_boxes = clip_model.detect(prompts)
+        self.get_logger().info("I'm here 3")
+        # log the bounding boxes
+        for box in bounding_boxes:
+            x, y, width, height, prompt = box.get_attributes()
+            self.get_logger().info(f"x: {x}, y: {y}, width: {width}, height: {height}, prompt: {prompt}")
+        self.get_logger().info("I'm here 4")
 
     def timer_callback(self):
+        # log state
+        self.get_logger().info(f"State: {self.state}")
         if self.state == State.IDLE:
             return
         elif self.state == State.SCANNING:
