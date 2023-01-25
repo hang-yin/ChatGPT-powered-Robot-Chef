@@ -9,7 +9,7 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 # image = Image.open(requests.get(url, stream=True).raw)
 
 # image = Image.open("./example2.jpg")
-image = Image.open("./pressure_cooker.jpg")
+image = Image.open("./images/pressure_cooker.jpg")
 
 # inputs = processor(text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pt", padding=True)
 # inputs = processor(text=["a photo of a fry pan", "a photo of beans", "a photo of eggs", "a photo of a hand", "a photo of a dog"], images=image, return_tensors="pt", padding=True)

@@ -4,7 +4,7 @@ import torch
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
 
 # Images
-imgs = ['./example2.png']  # batch of images
+imgs = ['./images/example2.png']  # batch of images
 
 # Inference
 results = model(imgs)

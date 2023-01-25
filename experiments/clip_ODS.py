@@ -101,7 +101,7 @@ def detect(prompts, img, patch_size=32, window=3, stride=1, threshold=0.8):
 
 
 if __name__ == "__main__":
-    image = Image.open("./example1.jpg")
+    image = Image.open("./images/example1.jpg")
     # convert image to PyTorch tensor using torchvision.transforms
     image = transforms.ToTensor()(image) # image shape [3, 401, 604]
     # item_list = ["an orange", "a banana", "an apple", "an eggplant", "a kiwi", "green beans", "a strawberry", "yellow pepper", "a corn", "a carrot"]

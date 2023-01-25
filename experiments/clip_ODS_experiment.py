@@ -6,7 +6,7 @@ from transformers import CLIPProcessor, CLIPModel
 import numpy as np
 import matplotlib.patches
 
-image = Image.open("./example1.jpg")
+image = Image.open("./images/example1.jpg")
 # convert image to PyTorch tensor using torchvision.transforms
 image = transforms.ToTensor()(image) # image shape [3, 401, 604]
 
