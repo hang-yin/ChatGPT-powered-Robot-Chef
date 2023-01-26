@@ -7,22 +7,20 @@ import openai
 
 LLM_CACHE = {}
 
-class GPT_Solver:
+class GPT_Solver():
     """
     TODO: add docstring
     """
 
     def __init__(self, engine="text-ada-001", termination_string="done()"):
         self.engine = engine
-        self.pick_targets = \
-        {
+        self.pick_targets = {
             "apple": None,
             "banana": None,
             "eggplant": None,
             "green beans": None,
         }
-        self.place_targets = \
-        {
+        self.place_targets = {
             "top left corner":     (-0.3 + 0.05, -0.2 - 0.05, 0),
             "top right corner":    (0.3 - 0.05,  -0.2 - 0.05, 0),
             "middle":              (0,           -0.5,        0),
@@ -47,7 +45,6 @@ class GPT_Solver:
         robot.pick_and_place(green beans, middle)
         done()
         """
-        self.gpt3_prompt = None
         self.max_tasks = 5
         self.termination_string = termination_string
     
@@ -62,6 +59,7 @@ class GPT_Solver:
         return options
 
     def gpt3_call(self, prompt, max_tokens=128, logprobs=1, temperature=0, echo=True):
+        """
         full_query = ""
         for p in prompt:
             full_query += p
@@ -69,17 +67,18 @@ class GPT_Solver:
         if id in LLM_CACHE.keys():
             print('cache hit, returning')
             response = LLM_CACHE[id]
-        else:
-            print('cache miss, calling')
-            response = openai.Completion.create(
-                engine=self.engine,
-                prompt=prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                logprobs=logprobs,
-                echo=echo,
-            )
-            LLM_CACHE[id] = response
+        """
+        # else:
+        # print('cache miss, calling')
+        response = openai.Completion.create(
+            engine=self.engine,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            logprobs=logprobs,
+            echo=echo,
+        )
+        # LLM_CACHE[id] = response
         return response
     
     def gpt3_scoring(self, query, options, option_start="\n"):
@@ -138,7 +137,8 @@ class GPT_Solver:
 
 if __name__ == "__main__":
     # ask for user input: api key
-    openai.api_key = input("Enter your OpenAI API key: ")
+    openai_api_key = input("Enter your OpenAI API key: ")
+    openai.api_key = openai_api_key
     solver = GPT_Solver()
     _ = solver.solve("put all the fruits in the middle.")
     

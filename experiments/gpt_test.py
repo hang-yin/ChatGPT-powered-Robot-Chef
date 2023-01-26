@@ -1,7 +1,7 @@
 import openai
 import time
 
-openai_api_key = ""
+openai_api_key = input("Enter your OpenAI API key: ")
 openai.api_key = openai_api_key
 # ENGINE = "text-davinci-001"
 ENGINE = "text-ada-001"
@@ -41,7 +41,7 @@ def gpt3_call(engine="text-ada-001", prompt="", max_tokens=128, temperature=0,
                                         logprobs=logprobs,
                                         echo=echo)
     LLM_CACHE[id] = response
-    time.sleep(30)
+    # time.sleep(30)
   return response
 
 def gpt3_scoring(query, options, engine="text-ada-001", limit_num_options=None, option_start="\n", verbose=False, print_tokens=False):
