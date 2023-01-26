@@ -131,15 +131,6 @@ class CLIP():
             scores = self.get_scores(img_patches, prompt)
             x, y, width, height = self.get_box(scores)
             boxes.append(BoundingBox(x, y, width, height, prompt))
-            """
-            # create the bounding box
-            rect = matplotlib.patches.Rectangle((x, y), width, height, linewidth=3, edgecolor=colors[i], facecolor='none')
-            # add label of bounding box to plot
-            ax.text(x, y, prompt, fontsize=12, color=colors[i])
-            # add the patch to the Axes
-            ax.add_patch(rect)
-            """
-        # plt.show()
         return boxes
 
 
@@ -241,7 +232,8 @@ class Vision(Node):
         # initialize a CLIP model
         clip_model = CLIP(color_tensor)
         # declare prompts
-        prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
+        # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
+        prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
         bounding_boxes = clip_model.detect(prompts)
         # log the bounding boxes
         for box in bounding_boxes:
