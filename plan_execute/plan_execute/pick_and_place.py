@@ -23,11 +23,15 @@ class State(Enum):
     """
     IDLE = auto()
     INTERPRET_INSTRUCTION = auto()
-    APPROACHING_OBJECT = auto()
-    GRASPING_OBJECT = auto()
-    APPROACHING_DESTINATION = auto()
-    PLACING_OBJECT = auto()
-    RETURNING_TO_BASE = auto()
+    PICK_READY = auto()
+    PICK = auto()
+    GRASP = auto()
+    PICK_RETURN = auto()
+    PLACE_READY = auto()
+    PLACE = auto()
+    RELEASE = auto()
+    PLACE_RETURN = auto()
+    HOME = auto()
 
 """
 class Targets(Enum):
@@ -42,6 +46,25 @@ class Targets(Enum):
     BOTTOM_RIGHT_CORNER = "bottom right corner"
 """    
 
+GPT_CONTEXT = """
+# move all fruits and vegetables to the top left corner.
+robot.pick_and_place(apple, top left corner)
+robot.pick_and_place(eggplant, top left corner)
+robot.pick_and_place(banana, top left corner)
+robot.pick_and_place(green beans, top left corner)
+done()
+
+# put the fruits in the top right corner.
+robot.pick_and_place(apple, top right corner)
+robot.pick_and_place(banana, top right corner)
+done()
+
+# move the vegetables to the middle.
+robot.pick_and_place(eggplant, middle)
+robot.pick_and_place(green beans, middle)
+done()
+"""
+
 class Pick_And_Place(Node):
     """
     TODO: write docstring
@@ -51,7 +74,8 @@ class Pick_And_Place(Node):
         super().__init__('pick_and_place')
         self.frequency = 100
         self.timer_period = 1 / self.frequency  # seconds
-        self.timer = self.create_timer(self.timer_period, self.timer_callback)
+        self.cbgroup = MutuallyExclusiveCallbackGroup()
+        self.timer = self.create_timer(self.timer_period, self.timer_callback, callback_group=self.cbgroup)
 
         # initialize subscription to a custom message that contains the pose of a detected object
         self.detection_sub = self.create_subscription(DetectedObject, 'detected_object', self.detection_callback, 10)
@@ -82,24 +106,9 @@ class Pick_And_Place(Node):
         # self.plan_and_execute = PlanAndExecute(self)
 
         self.curr_instruction = None
-        self.gpt_context = """
-# move all fruits and vegetables to the top left corner.
-robot.pick_and_place(apple, top left corner)
-robot.pick_and_place(eggplant, top left corner)
-robot.pick_and_place(banana, top left corner)
-robot.pick_and_place(green beans, top left corner)
-done()
+        self.gpt_context = GPT_CONTEXT
 
-# put the fruits in the top right corner.
-robot.pick_and_place(apple, top right corner)
-robot.pick_and_place(banana, top right corner)
-done()
-
-# move the vegetables to the middle.
-robot.pick_and_place(eggplant, middle)
-robot.pick_and_place(green beans, middle)
-done()
-"""
+        self.steps = []
 
     def timer_callback(self):
         """
@@ -127,12 +136,42 @@ done()
                 self.get_logger().info("#" + str(num_tasks) + " selected task: " + selected_task)
                 # print(num_tasks, "Selecting: ", selected_task)
                 gpt3_prompt += selected_task + "\n"
+            self.steps = steps_text
+            """
             self.get_logger().info("Done with instruction: " + self.curr_instruction)
             for i, step in enumerate(steps_text):
                 if step == '' or step == termination_string:
                     break
                 self.get_logger().info("Step " + str(i) + ": " + step)
+            """
+            self.current_state = State.PICK_READY
+        elif self.current_state == State.PICK_READY:
+            pass
+        elif self.current_state == State.PICK:
+            pass
+        elif self.current_state == State.GRASP:
+            pass
+        elif self.current_state == State.PICK_RETURN:
+            pass
+        elif self.current_state == State.PLACE_READY:
+            pass
+        elif self.current_state == State.PLACE:
+            pass
+        elif self.current_state == State.RELEASE:
+            pass
+        elif self.current_state == State.PLACE_RETURN:
+            # TODO: go to place return position
+            # remove the first step from the list of steps
+            self.steps.pop(0)
+            # if there are no more steps, we are done executing the instruction
+            if len(self.steps) == 0:
+                self.current_state = State.HOME
+            else:
+                self.current_state = State.PICK_READY
+        elif self.current_state == State.HOME:
+            # TODO: return to home position
             self.current_state = State.IDLE
+            
     
     def make_options(self, options_in_api_form=True, termination_string="done()"):
         options = []
@@ -210,7 +249,7 @@ done()
         return response
 
 def pick_and_place_entry():
-    openai_api_key = "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"
+    openai_api_key = ""
     openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
