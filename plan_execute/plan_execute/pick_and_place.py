@@ -65,8 +65,6 @@ class Pick_And_Place(Node):
             "banana": Point(),
             "eggplant": Point(),
             "green beans": Point(),
-            "carrot": Point(),
-            "yellow pepper": Point(),
         }
 
         self.place_targets = {
@@ -85,23 +83,23 @@ class Pick_And_Place(Node):
 
         self.curr_instruction = None
         self.gpt_context = """
-        # move all fruits and vegetables to the top left corner.
-        robot.pick_and_place(apple, top left corner)
-        robot.pick_and_place(eggplant, top left corner)
-        robot.pick_and_place(banana, top left corner)
-        robot.pick_and_place(green beans, top left corner)
-        done()
+# move all fruits and vegetables to the top left corner.
+robot.pick_and_place(apple, top left corner)
+robot.pick_and_place(eggplant, top left corner)
+robot.pick_and_place(banana, top left corner)
+robot.pick_and_place(green beans, top left corner)
+done()
 
-        # put the fruits in the top right corner.
-        robot.pick_and_place(apple, top right corner)
-        robot.pick_and_place(banana, top right corner)
-        done()
+# put the fruits in the top right corner.
+robot.pick_and_place(apple, top right corner)
+robot.pick_and_place(banana, top right corner)
+done()
 
-        # move the vegetables to the middle.
-        robot.pick_and_place(eggplant, middle)
-        robot.pick_and_place(green beans, middle)
-        done()
-        """
+# move the vegetables to the middle.
+robot.pick_and_place(eggplant, middle)
+robot.pick_and_place(green beans, middle)
+done()
+"""
 
     def timer_callback(self):
         """
@@ -111,7 +109,8 @@ class Pick_And_Place(Node):
             return
         elif self.current_state == State.INTERPRET_INSTRUCTION:
             termination_string = "done()"
-            gpt3_prompt = self.gpt3_context + "\n#" + self.curr_instruction + "\n"
+            gpt3_prompt = self.gpt_context + "\n#" + self.curr_instruction + "\n"
+            self.get_logger().info("GPT3 prompt: " + gpt3_prompt)
             options = self.make_options(termination_string=termination_string)
             num_tasks = 0
             max_tasks = 5
@@ -128,11 +127,12 @@ class Pick_And_Place(Node):
                 self.get_logger().info("#" + str(num_tasks) + " selected task: " + selected_task)
                 # print(num_tasks, "Selecting: ", selected_task)
                 gpt3_prompt += selected_task + "\n"
-        self.get_logger().info("Done with instruction: " + self.curr_instruction)
-        for i, step in enumerate(steps_text):
-            if step == '' or step == termination_string:
-                break
-            self.get_logger().info("Step " + str(i) + ": " + step)
+            self.get_logger().info("Done with instruction: " + self.curr_instruction)
+            for i, step in enumerate(steps_text):
+                if step == '' or step == termination_string:
+                    break
+                self.get_logger().info("Step " + str(i) + ": " + step)
+            self.current_state = State.IDLE
     
     def make_options(self, options_in_api_form=True, termination_string="done()"):
         options = []
@@ -166,7 +166,6 @@ class Pick_And_Place(Node):
 
             total_logprob = 0
             for token, token_logprob in zip(reversed(tokens), reversed(token_logprobs)):
-                self.get_logger().info("token: " + str(token) + " token_logprob: " + str(token_logprob))
                 if option_start is None and not token in option:
                     break
                 if token == option_start:
@@ -181,8 +180,7 @@ class Pick_And_Place(Node):
 
         return scores, response
     
-    def gpt3_call(engine="text-ada-001", prompt="", max_tokens=128, temperature=0, 
-              logprobs=1, echo=False):
+    def gpt3_call(self, engine="text-ada-001", prompt="", max_tokens=128, temperature=0, logprobs=1, echo=False):
         response = openai.Completion.create(engine=engine, 
                                             prompt=prompt, 
                                             max_tokens=max_tokens, 
@@ -209,8 +207,11 @@ class Pick_And_Place(Node):
         self.curr_instruction = request.instruction
         self.get_logger().info('Received instruction: ' + self.curr_instruction)
         self.current_state = State.INTERPRET_INSTRUCTION
+        return response
 
 def pick_and_place_entry():
+    openai_api_key = "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"
+    openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
     rclpy.spin(pick_and_place)

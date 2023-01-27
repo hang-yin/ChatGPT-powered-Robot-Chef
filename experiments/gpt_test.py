@@ -119,6 +119,7 @@ done()
 """
 raw_input = "put all the fruits in the middle." 
 gpt3_prompt = gpt3_context + "\n#" + raw_input + "\n"
+print(gpt3_prompt)
 options = make_options(PICK_TARGETS, PLACE_TARGETS, termination_string=termination_string)
 
 num_tasks = 0
