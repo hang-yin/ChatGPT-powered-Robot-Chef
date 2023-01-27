@@ -103,14 +103,25 @@ class Pick_And_Place(Node):
         self.current_pick_target = None
         self.current_place_target = None
 
-        # self.plan_and_execute = PlanAndExecute(self)
+        self.plan_and_execute = PlanAndExecute(self)
 
         self.curr_instruction = None
         self.gpt_context = GPT_CONTEXT
 
         self.steps = []
+        self.curr_pick_target = None
+        self.curr_place_target = None
 
-    def timer_callback(self):
+        self.goal_pose = Pose()
+        self.goal_pose.position.x = 0.0
+        self.goal_pose.position.y = 0.0
+        self.goal_pose.position.z = 0.0
+        self.goal_pose.orientation.x = 0.0
+        self.goal_pose.orientation.y = 0.0
+        self.goal_pose.orientation.z = 0.0
+        self.goal_pose.orientation.w = 0.1
+
+    async def timer_callback(self):
         """
         Main loop of the node. This function is called periodically at the frequency specified by self.timer_period.
         """
@@ -119,7 +130,7 @@ class Pick_And_Place(Node):
         elif self.current_state == State.INTERPRET_INSTRUCTION:
             termination_string = "done()"
             gpt3_prompt = self.gpt_context + "\n#" + self.curr_instruction + "\n"
-            self.get_logger().info("GPT3 prompt: " + gpt3_prompt)
+            # self.get_logger().info("GPT3 prompt: " + gpt3_prompt)
             options = self.make_options(termination_string=termination_string)
             num_tasks = 0
             max_tasks = 5
@@ -137,16 +148,22 @@ class Pick_And_Place(Node):
                 # print(num_tasks, "Selecting: ", selected_task)
                 gpt3_prompt += selected_task + "\n"
             self.steps = steps_text
-            """
             self.get_logger().info("Done with instruction: " + self.curr_instruction)
             for i, step in enumerate(steps_text):
                 if step == '' or step == termination_string:
                     break
                 self.get_logger().info("Step " + str(i) + ": " + step)
-            """
             self.current_state = State.PICK_READY
         elif self.current_state == State.PICK_READY:
-            pass
+            self.curr_pick_target = self.steps[0].split()[0]
+            self.curr_place_target = self.steps[0].split()[2]
+            pick_ready = copy.deepcopy(self.goal_pose)
+            pick_ready.position.x = self.pick_targets[self.curr_pick_target].x
+            pick_ready.position.y = self.pick_targets[self.curr_pick_target].y
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(None,
+                                                                             pick_ready,
+                                                                             1.0,
+                                                                             True)
         elif self.current_state == State.PICK:
             pass
         elif self.current_state == State.GRASP:
@@ -171,14 +188,13 @@ class Pick_And_Place(Node):
         elif self.current_state == State.HOME:
             # TODO: return to home position
             self.current_state = State.IDLE
-            
     
     def make_options(self, options_in_api_form=True, termination_string="done()"):
         options = []
         for pick in self.pick_targets:
             for place in self.place_targets:
                 if options_in_api_form:
-                    option = "robot.pick_and_place({}, {})".format(pick, place)
+                    option = "{} -> {}".format(pick, place)
                 else:
                     option = "Pick the {} and place it on the {}.".format(pick, place)
                 options.append(option)
