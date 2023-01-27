@@ -15,7 +15,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='yinhang6917',
+    maintainer='yh6917',
     maintainer_email='yinhang0226@gmail.com',
     description='ROS2 Python package for controlling the Franka Emika Panda robot arm',
     license='MIT',

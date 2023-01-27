@@ -8,7 +8,7 @@ import cv2
 import pyrealsense2 as rs2
 from enum import Enum, auto
 from std_srvs.srv import Empty
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, Point
 from math import dist
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import torch
 from torchvision import transforms
 from transformers import CLIPProcessor, CLIPModel
+from plan_execute_interface.msg import DetectedObject
 
 class State(Enum):
     """The current state of the scan."""
@@ -51,9 +52,9 @@ class CLIP():
         self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
-        self.patch_size = 64
+        self.patch_size = 32
         self.window_size = 3
-        self.threshold = 0.95
+        self.threshold = 0.9
         self.color_img = color_image
     
     def get_patches(self):
@@ -119,6 +120,8 @@ class CLIP():
     def detect(self, prompts, stride=1):
         # build image patches for detection
         img_patches = self.get_patches()
+        # only consider the bottom half of the image
+        # img_patches = img_patches[:, img_patches.shape[1]//2:, :, :, :]
         # convert image to format for displaying with matplotlib
         image = np.moveaxis(self.color_img.data.numpy(), 0, -1)
         # initialize plot to display image + bounding boxes
@@ -157,6 +160,9 @@ class Vision(Node):
                                                  '/camera/aligned_depth_to_color/camera_info',
                                                  self.info_callback,
                                                  10)
+        # create publisher for bounding boxes - DetectedObject
+        self.bounding_boxes_pub = self.create_publisher(DetectedObject, 'detected_object', 10)
+
         # create cv bridge
         self.bridge = CvBridge()
         # initialize transform broadcaster
@@ -173,7 +179,6 @@ class Vision(Node):
         self.intrinsics = None
 
         self.window = "Bounding boxes on color image"
-        cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
 
 
     def info_callback(self, cameraInfo):
@@ -233,13 +238,19 @@ class Vision(Node):
         clip_model = CLIP(color_tensor)
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
-        prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
+        # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
+        prompts = ["purple eggplant", "orange carrot", "red apple", "yellow pepper"]
         bounding_boxes = clip_model.detect(prompts)
         # log the bounding boxes
         for box in bounding_boxes:
             x, y, width, height, prompt = box.get_attributes()
             self.get_logger().info(f"x: {x}, y: {y}, width: {width}, height: {height}, prompt: {prompt}")
+            # publish this box
+            # TODO: add z coordinate from depth image
+            detected_obj = DetectedObject(object_name=prompt, position=Point(x=float(x), y=float(y), z=0.0))
+            self.bounding_boxes_pub.publish(detected_obj)
         # show the color image with bounding boxes
+        cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
         self.draw_bounding_boxes(bounding_boxes)
         cv2.imshow(self.window, self.color)
         cv2.waitKey(0)
@@ -252,6 +263,9 @@ class Vision(Node):
         elif self.state == State.SCANNING:
             if self.color is None or self.depth is None:
                 return
+            # cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
+            # cv2.imshow(self.window, self.color)
+            # cv2.waitKey(0)
             self.scan()
             self.state = State.IDLE
 

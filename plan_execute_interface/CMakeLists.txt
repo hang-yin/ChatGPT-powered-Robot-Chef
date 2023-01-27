@@ -17,6 +17,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GoHere.srv"
   "srv/Place.srv"
+  "srv/Instruction.srv"
   "msg/DetectedObject.msg"
   DEPENDENCIES geometry_msgs)
 
