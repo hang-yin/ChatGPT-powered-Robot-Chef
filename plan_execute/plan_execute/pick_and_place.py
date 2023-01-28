@@ -21,6 +21,7 @@ class State(Enum):
 
     Determines what the main timer function should be doing on each iteration
     """
+    START = auto()
     IDLE = auto()
     INTERPRET_INSTRUCTION = auto()
     PICK_READY = auto()
@@ -32,6 +33,8 @@ class State(Enum):
     RELEASE = auto()
     PLACE_RETURN = auto()
     HOME = auto()
+    PLACE_PLANE = auto()
+    CARTESIAN = auto()
 
 """
 class Targets(Enum):
@@ -87,7 +90,7 @@ class Pick_And_Place(Node):
         self.pick_targets = {
             "apple": Point(),
             "banana": Point(),
-            "eggplant": Point(),
+            "eggplant": Point(x=0.465, y=0.0, z=0.032),
             "green beans": Point(),
         }
 
@@ -99,33 +102,60 @@ class Pick_And_Place(Node):
             "bottom right corner": Point(x=0.5, y=-0.5, z=0.0),
         }
     
-        self.current_state = State.IDLE
-        self.current_pick_target = None
-        self.current_place_target = None
+        self.current_state = State.START
 
+        self.movegroup = None
         self.plan_and_execute = PlanAndExecute(self)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.curr_instruction = None
         self.gpt_context = GPT_CONTEXT
 
         self.steps = []
-        self.curr_pick_target = None
+        self.curr_pick_target = "eggplant"
         self.curr_place_target = None
 
         self.goal_pose = Pose()
         self.goal_pose.position.x = 0.0
         self.goal_pose.position.y = 0.0
         self.goal_pose.position.z = 0.0
-        self.goal_pose.orientation.x = 0.0
+        self.goal_pose.orientation.x = 1.0
         self.goal_pose.orientation.y = 0.0
         self.goal_pose.orientation.z = 0.0
-        self.goal_pose.orientation.w = 0.1
+        self.goal_pose.orientation.w = 0.0
+
+        self.future = None
+        self.ct = 0
+
+    def cart_callback(self, request, response):
+        """
+        Call a custom service that takes one Pose of variable length, a regular Pose, and a bool.
+
+        The user can pass a custom start postion to the service and a desired end goal. The boolean
+        indicates whether to plan or execute the path.
+        """
+        self.goal_pose = request.goal_pose
+        self.execute = True
+        self.start_pose = None
+        self.current_state = State.CARTESIAN
+        response.success = True
+        return response
 
     async def timer_callback(self):
         """
         Main loop of the node. This function is called periodically at the frequency specified by self.timer_period.
         """
-        if self.current_state == State.IDLE:
+        if self.current_state == State.START:
+            if self.ct == 100:
+                self.current_state = State.PLACE_PLANE
+                self.ct = 0
+            else:
+                self.ct += 1
+        elif self.current_state == State.PLACE_PLANE:
+            self.current_state = State.PICK_READY
+            await self.place_plane()
+        elif self.current_state == State.IDLE:
             return
         elif self.current_state == State.INTERPRET_INSTRUCTION:
             termination_string = "done()"
@@ -155,15 +185,21 @@ class Pick_And_Place(Node):
                 self.get_logger().info("Step " + str(i) + ": " + step)
             self.current_state = State.PICK_READY
         elif self.current_state == State.PICK_READY:
+            """
             self.curr_pick_target = self.steps[0].split()[0]
+            self.get_logger().info("Current pick target: " + self.curr_pick_target)
             self.curr_place_target = self.steps[0].split()[2]
+            self.get_logger().info("Current place target: " + self.curr_place_target)
+            """
             pick_ready = copy.deepcopy(self.goal_pose)
             pick_ready.position.x = self.pick_targets[self.curr_pick_target].x
             pick_ready.position.y = self.pick_targets[self.curr_pick_target].y
-            self.future = await self.plan_and_execute.plan_to_cartisian_pose(None,
-                                                                             pick_ready,
-                                                                             1.0,
-                                                                             True)
+            pick_ready.position.z = 0.17
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=pick_ready,
+                                                                             v=0.5,
+                                                                             execute=True)
+            self.current_state = State.IDLE
         elif self.current_state == State.PICK:
             pass
         elif self.current_state == State.GRASP:
@@ -189,6 +225,20 @@ class Pick_And_Place(Node):
             # TODO: return to home position
             self.current_state = State.IDLE
     
+    async def place_plane(self):
+        """Places a plane for the table in RVIZ."""
+        plane_pose = Pose()
+        plane_pose.position.x = 0.0
+        plane_pose.position.y = 0.0
+        plane_pose.position.z = -0.14
+        plane_pose.orientation.x = 0.0
+        plane_pose.orientation.y = 0.0
+        plane_pose.orientation.z = 0.0
+        plane_pose.orientation.w = 1.0
+        self.get_logger().info("Placing plane")
+        await self.plan_and_execute.place_block(plane_pose, [10.0, 10.0, 0.1], 'plane')
+        self.get_logger().info("Plane placed")
+
     def make_options(self, options_in_api_form=True, termination_string="done()"):
         options = []
         for pick in self.pick_targets:

@@ -255,8 +255,7 @@ class PlanAndExecute:
         """
         startpose = Pose()
         temp_frame_id = self.master_goal.request.workspace_parameters.header.frame_id
-        t = self.tf_buffer.lookup_transform(
-                                            temp_frame_id,
+        t = self.tf_buffer.lookup_transform(temp_frame_id,
                                             'panda_hand_tcp',
                                             rclpy.time.Time())
         startpose.position.x = t.transform.translation.x
