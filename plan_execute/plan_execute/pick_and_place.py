@@ -100,6 +100,7 @@ class Pick_And_Place(Node):
             "middle": Point(x=0.5, y=0.0, z=0.0),
             "bottom left corner": Point(x=0.5, y=0.5, z=0.0),
             "bottom right corner": Point(x=0.5, y=-0.5, z=0.0),
+            "basket": Point(x=0.35, y=-0.21, z=0.17),
         }
     
         self.current_state = State.START
@@ -114,7 +115,7 @@ class Pick_And_Place(Node):
 
         self.steps = []
         self.curr_pick_target = "eggplant"
-        self.curr_place_target = None
+        self.curr_place_target = "basket"
 
         self.goal_pose = Pose()
         self.goal_pose.position.x = 0.0
@@ -127,6 +128,15 @@ class Pick_And_Place(Node):
 
         self.future = None
         self.ct = 0
+
+        self.home_pose = Pose()
+        self.home_pose.position.x = 0.3
+        self.home_pose.position.y = 0.0
+        self.home_pose.position.z = 0.487
+        self.home_pose.orientation.x = 1.0
+        self.home_pose.orientation.y = 0.0
+        self.home_pose.orientation.z = 0.0
+        self.home_pose.orientation.w = 0.0
 
     def cart_callback(self, request, response):
         """
@@ -199,30 +209,77 @@ class Pick_And_Place(Node):
                                                                              end_pose=pick_ready,
                                                                              v=0.5,
                                                                              execute=True)
-            self.current_state = State.IDLE
+            self.current_state = State.PICK
         elif self.current_state == State.PICK:
-            pass
+            pick = copy.deepcopy(self.goal_pose)
+            pick.position.x = self.pick_targets[self.curr_pick_target].x
+            pick.position.y = self.pick_targets[self.curr_pick_target].y
+            pick.position.z = self.pick_targets[self.curr_pick_target].z
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=pick,
+                                                                             v=0.5,
+                                                                             execute=True)
+            self.current_state = State.GRASP
         elif self.current_state == State.GRASP:
-            pass
+            self.future = await self.plan_and_execute.grab(0.08)
+            time.sleep(4)
+            self.current_state = State.PICK_RETURN
         elif self.current_state == State.PICK_RETURN:
-            pass
+            pick_return = copy.deepcopy(self.goal_pose)
+            pick_return.position.x = self.pick_targets[self.curr_pick_target].x
+            pick_return.position.y = self.pick_targets[self.curr_pick_target].y
+            pick_return.position.z = 0.17
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=pick_return,
+                                                                             v=0.5,
+                                                                             execute=True)
+            self.current_state = State.PLACE_READY
         elif self.current_state == State.PLACE_READY:
-            pass
+            place_ready = copy.deepcopy(self.goal_pose)
+            place_ready.position.x = self.place_targets[self.curr_place_target].x
+            place_ready.position.y = self.place_targets[self.curr_place_target].y
+            place_ready.position.z = 0.17
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=place_ready,
+                                                                             v=0.5,
+                                                                             execute=True)
+            self.current_state = State.PLACE
         elif self.current_state == State.PLACE:
-            pass
+            place = copy.deepcopy(self.goal_pose)
+            place.position.x = self.place_targets[self.curr_place_target].x
+            place.position.y = self.place_targets[self.curr_place_target].y
+            place.position.z = self.place_targets[self.curr_place_target].z
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=place,
+                                                                             v=0.5,
+                                                                             execute=True)
+            self.current_state = State.RELEASE
         elif self.current_state == State.RELEASE:
-            pass
+            self.future = await self.plan_and_execute.release()
+            time.sleep(4)
+            self.current_state = State.PLACE_RETURN
         elif self.current_state == State.PLACE_RETURN:
-            # TODO: go to place return position
+            place_return = copy.deepcopy(self.goal_pose)
+            place_return.position.x = self.place_targets[self.curr_place_target].x
+            place_return.position.y = self.place_targets[self.curr_place_target].y
+            place_return.position.z = 0.17
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=place_return,
+                                                                             v=0.5,
+                                                                             execute=True)
             # remove the first step from the list of steps
-            self.steps.pop(0)
+            if len(self.steps) > 0:
+                self.steps.pop(0)
             # if there are no more steps, we are done executing the instruction
             if len(self.steps) == 0:
                 self.current_state = State.HOME
             else:
                 self.current_state = State.PICK_READY
         elif self.current_state == State.HOME:
-            # TODO: return to home position
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=self.home_pose,
+                                                                             v=0.5,
+                                                                             execute=True)
             self.current_state = State.IDLE
     
     async def place_plane(self):
