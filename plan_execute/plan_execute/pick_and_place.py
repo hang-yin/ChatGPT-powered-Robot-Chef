@@ -66,6 +66,11 @@ done()
 robot.pick_and_place(eggplant, middle)
 robot.pick_and_place(green beans, middle)
 done()
+
+# move the vegetables to the basket.
+robot.pick_and_place(eggplant, basket)
+robot.pick_and_place(green beans, basket)
+done()
 """
 
 class Pick_And_Place(Node):
@@ -88,10 +93,17 @@ class Pick_And_Place(Node):
 
         # create a dictionary with pick/place targets as keys and their corresponding poses as values
         self.pick_targets = {
-            "apple": Point(),
-            "banana": Point(),
+            "apple": Point(x=0.397, y=0.275, z=0.04),
+            "banana": Point(x=0.465, y=0.0, z=0.030),
             "eggplant": Point(x=0.465, y=0.0, z=0.032),
             "green beans": Point(),
+        }
+
+        self.pick_widths = {
+            "apple": 0.06,
+            "banana": 0.07,
+            "eggplant": 0.08,
+            "green beans": 0.07,
         }
 
         self.place_targets = {
@@ -100,7 +112,7 @@ class Pick_And_Place(Node):
             "middle": Point(x=0.5, y=0.0, z=0.0),
             "bottom left corner": Point(x=0.5, y=0.5, z=0.0),
             "bottom right corner": Point(x=0.5, y=-0.5, z=0.0),
-            "basket": Point(x=0.35, y=-0.21, z=0.17),
+            "basket": Point(x=0.35, y=-0.21, z=0.18),
         }
     
         self.current_state = State.START
@@ -114,8 +126,8 @@ class Pick_And_Place(Node):
         self.gpt_context = GPT_CONTEXT
 
         self.steps = []
-        self.curr_pick_target = "eggplant"
-        self.curr_place_target = "basket"
+        self.curr_pick_target = None
+        self.curr_place_target = None
 
         self.goal_pose = Pose()
         self.goal_pose.position.x = 0.0
@@ -163,7 +175,7 @@ class Pick_And_Place(Node):
             else:
                 self.ct += 1
         elif self.current_state == State.PLACE_PLANE:
-            self.current_state = State.PICK_READY
+            self.current_state = State.IDLE
             await self.place_plane()
         elif self.current_state == State.IDLE:
             return
@@ -195,16 +207,22 @@ class Pick_And_Place(Node):
                 self.get_logger().info("Step " + str(i) + ": " + step)
             self.current_state = State.PICK_READY
         elif self.current_state == State.PICK_READY:
-            """
-            self.curr_pick_target = self.steps[0].split()[0]
+            if len(self.steps) == 1:
+                self.get_logger().info("Done executing instruction")
+                self.steps.pop(0)
+                self.current_state = State.HOME
+                return
+            # self.curr_pick_target = self.steps[0].split()[0]
+            split = self.steps[0][21:-1].split(', ')
+            self.curr_pick_target = split[0]
             self.get_logger().info("Current pick target: " + self.curr_pick_target)
-            self.curr_place_target = self.steps[0].split()[2]
+            # self.curr_place_target = self.steps[0].split()[2]
+            self.curr_place_target = split[1]
             self.get_logger().info("Current place target: " + self.curr_place_target)
-            """
             pick_ready = copy.deepcopy(self.goal_pose)
             pick_ready.position.x = self.pick_targets[self.curr_pick_target].x
             pick_ready.position.y = self.pick_targets[self.curr_pick_target].y
-            pick_ready.position.z = 0.17
+            pick_ready.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=pick_ready,
                                                                              v=0.5,
@@ -221,14 +239,14 @@ class Pick_And_Place(Node):
                                                                              execute=True)
             self.current_state = State.GRASP
         elif self.current_state == State.GRASP:
-            self.future = await self.plan_and_execute.grab(0.08)
+            self.future = await self.plan_and_execute.grab(self.pick_widths[self.curr_pick_target])
             time.sleep(4)
             self.current_state = State.PICK_RETURN
         elif self.current_state == State.PICK_RETURN:
             pick_return = copy.deepcopy(self.goal_pose)
             pick_return.position.x = self.pick_targets[self.curr_pick_target].x
             pick_return.position.y = self.pick_targets[self.curr_pick_target].y
-            pick_return.position.z = 0.17
+            pick_return.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=pick_return,
                                                                              v=0.5,
@@ -238,7 +256,7 @@ class Pick_And_Place(Node):
             place_ready = copy.deepcopy(self.goal_pose)
             place_ready.position.x = self.place_targets[self.curr_place_target].x
             place_ready.position.y = self.place_targets[self.curr_place_target].y
-            place_ready.position.z = 0.17
+            place_ready.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=place_ready,
                                                                              v=0.5,
@@ -262,19 +280,20 @@ class Pick_And_Place(Node):
             place_return = copy.deepcopy(self.goal_pose)
             place_return.position.x = self.place_targets[self.curr_place_target].x
             place_return.position.y = self.place_targets[self.curr_place_target].y
-            place_return.position.z = 0.17
+            place_return.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=place_return,
                                                                              v=0.5,
                                                                              execute=True)
+            # print all the steps in self.steps
+            for i in range(len(self.steps)):
+                self.get_logger().info("Step " + str(i) + ": " + self.steps[i])
             # remove the first step from the list of steps
             if len(self.steps) > 0:
                 self.steps.pop(0)
-            # if there are no more steps, we are done executing the instruction
-            if len(self.steps) == 0:
-                self.current_state = State.HOME
-            else:
                 self.current_state = State.PICK_READY
+            else:
+                self.current_state = State.HOME
         elif self.current_state == State.HOME:
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=self.home_pose,
@@ -301,7 +320,7 @@ class Pick_And_Place(Node):
         for pick in self.pick_targets:
             for place in self.place_targets:
                 if options_in_api_form:
-                    option = "{} -> {}".format(pick, place)
+                    option = "robot.pick_and_place({}, {})".format(pick, place)
                 else:
                     option = "Pick the {} and place it on the {}.".format(pick, place)
                 options.append(option)
@@ -372,7 +391,7 @@ class Pick_And_Place(Node):
         return response
 
 def pick_and_place_entry():
-    openai_api_key = ""
+    openai_api_key = "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"
     openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
