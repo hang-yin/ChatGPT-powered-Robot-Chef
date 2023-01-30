@@ -54,7 +54,7 @@ class CLIP():
         self.model.to(self.device)
         self.patch_size = 32
         self.window_size = 3
-        self.threshold = 0.9
+        self.threshold = 0.8
         self.color_img = color_image
     
     def get_patches(self):
@@ -100,13 +100,19 @@ class CLIP():
             scores = np.clip(scores-scores.mean(), 0, np.inf)
         # normalize scores
         scores = (scores - scores.min()) / (scores.max() - scores.min())
-        return scores
+        # create a tensor of zeros with the same shape as scores
+        adj_scores = torch.zeros(scores.shape[0], scores.shape[1])
+        for i in range(scores.shape[0]):
+            for j in range(scores.shape[1]):
+                if scores[i, j] > self.threshold:
+                    adj_scores[i, j] = scores[i, j]
+        return adj_scores
     
     def get_box(self, scores):
-        detection = scores > self.threshold
+        # detection = scores > self.threshold
         # find box corners
-        y_min, y_max = np.nonzero(detection)[:,0].min().item(), np.nonzero(detection)[:,0].max().item()+1
-        x_min, x_max = np.nonzero(detection)[:,1].min().item(), np.nonzero(detection)[:,1].max().item()+1
+        y_min, y_max = np.nonzero(scores)[:,0].min().item(), np.nonzero(scores)[:,0].max().item()+1
+        x_min, x_max = np.nonzero(scores)[:,1].min().item(), np.nonzero(scores)[:,1].max().item()+1
         # convert from patch co-ords to pixel co-ords
         y_min *= self.patch_size
         y_max *= self.patch_size
@@ -217,14 +223,13 @@ class Vision(Node):
         except CvBridgeError:
             self.get_logger().info("Getting depth image failed?")
             return
-    
+
     def draw_bounding_boxes(self, boxes):
         """Draw bounding boxes on the color image using cv2"""
         for box in boxes:
             x, y, width, height, prompt = box.get_attributes()
             cv2.rectangle(self.color, (x, y), (x + width, y + height), (0, 255, 0), 2)
             cv2.putText(self.color, prompt, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
-        
 
     def scan(self):
         # take self.color to do CLIP
@@ -239,7 +244,7 @@ class Vision(Node):
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
-        prompts = ["purple eggplant", "orange carrot", "red apple", "yellow pepper"]
+        prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
         bounding_boxes = clip_model.detect(prompts)
         # log the bounding boxes
         for box in bounding_boxes:

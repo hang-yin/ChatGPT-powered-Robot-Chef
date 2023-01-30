@@ -391,7 +391,7 @@ class Pick_And_Place(Node):
         return response
 
 def pick_and_place_entry():
-    openai_api_key = "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"
+    openai_api_key = ""
     openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
