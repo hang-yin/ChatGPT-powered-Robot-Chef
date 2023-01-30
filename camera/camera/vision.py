@@ -26,6 +26,7 @@ class State(Enum):
     """The current state of the scan."""
     IDLE = auto()
     SCANNING = auto()
+    PUBLISH_OBJECTS = auto()
 
 
 class BoundingBox():
@@ -186,6 +187,11 @@ class Vision(Node):
 
         self.window = "Bounding boxes on color image"
 
+        self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
+
+        self.object_frame = TransformStamped()
+        self.object_frame.header.frame_id = 'camera_link'
+
 
     def info_callback(self, cameraInfo):
         """Store the intrinsics of the camera."""
@@ -244,8 +250,8 @@ class Vision(Node):
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
-        prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
-        bounding_boxes = clip_model.detect(prompts)
+        
+        bounding_boxes = clip_model.detect(self.prompts)
         # log the bounding boxes
         for box in bounding_boxes:
             x, y, width, height, prompt = box.get_attributes()
