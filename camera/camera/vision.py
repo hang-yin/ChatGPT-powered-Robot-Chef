@@ -15,7 +15,6 @@ from geometry_msgs.msg import TransformStamped
 from std_msgs.msg import Bool, Int16
 from ament_index_python.packages import get_package_share_path
 from tqdm.auto import tqdm
-import matplotlib.patches
 import matplotlib.pyplot as plt
 import torch
 from torchvision import transforms
@@ -198,8 +197,8 @@ class Vision(Node):
         self.window = "Bounding boxes on color image"
 
         # self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
-        # self.prompts = ["carrot", "green beans", "yellow pepper"]
-        self.prompts = ["carrot"]
+        self.prompts = ["carrot", "green beans", "yellow pepper"]
+        # self.prompts = ["carrot"]
 
         self.object_frame = TransformStamped()
         self.object_frame.header.frame_id = 'camera_link'
@@ -254,8 +253,12 @@ class Vision(Node):
         # convert self.color to a tensor of shape [3, height, width]
         pil_image = PILImage.fromarray(self.color)
         color_tensor = transforms.ToTensor()(pil_image)
+        # switch the first and third channels
+        color_tensor = color_tensor[[2, 1, 0], :, :]
         # log the shape of the color tensor
         self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
+        # log the entire color tensor
+        self.get_logger().info(f"Color tensor: {color_tensor}")
         """
         # log shape of self.color
         self.get_logger().info(f"Color image shape: {self.color.shape}")
