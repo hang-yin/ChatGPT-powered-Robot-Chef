@@ -1,0 +1,85 @@
+body {
+    background-color: #181717;
+  }
+
+.chat-interface {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .right-side {
+    width: 50%;
+    background-color: #181717;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
+  }
+  
+  .message {
+    background-color: #f1f0f0;
+    border-radius: 10px;
+    padding: 10px;
+    margin: 10px;
+    box-shadow: 2px 2px 5px rgb(90, 88, 88);
+    display: inline-block;
+    font-size: 20px;
+  }
+  
+  .received {
+    float: left;
+    clear: both;
+    align-self: flex-start;
+    background-color: rgb(92, 88, 88);
+  }
+  
+  .sent {
+    float: right;
+    clear: both;
+    align-self: flex-end;
+    background-color: rgb(54, 183, 54);
+  }
+
+  .bot-message {
+    color: white;
+  }
+  
+  .input-container {
+    width: 100%;
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .input {
+    flex: 1;
+    width: 80%;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    font-size: 20px;
+    background-color: rgb(103, 101, 101);
+    color: rgb(246, 241, 246);
+  }
+  
+  .submit-button {
+    width: 20%;
+    padding: 10px 20px;
+    background-color: rgb(96, 173, 198);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  
