@@ -197,7 +197,8 @@ class Vision(Node):
         self.window = "Bounding boxes on color image"
 
         # self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
-        self.prompts = ["carrot", "green beans", "yellow pepper"]
+        # self.prompts = ["carrot", "green beans", "yellow pepper"]
+        self.prompts = ["banana", "eggplant", "apple"]
         # self.prompts = ["carrot"]
 
         self.object_frame = TransformStamped()
@@ -282,8 +283,24 @@ class Vision(Node):
             x, y, width, height, prompt = box.get_attributes()
             self.get_logger().info(f"x: {x}, y: {y}, width: {width}, height: {height}, prompt: {prompt}")
             # publish this box
-            # TODO: add z coordinate from depth image
-            detected_obj = DetectedObject(object_name=prompt, position=Point(x=float(x), y=float(y), z=0.0))
+            x_coord = x + int(width / 2)
+            y_coord = y + int(height / 2)
+            z_coord = self.depth[y_coord, x_coord]
+            # log the x, y, z coordinates
+            self.get_logger().info(f"Before deprojection x: {x_coord}, y: {y_coord}, z: {z_coord}")
+            object_deprojected = rs2.rs2_deproject_pixel_to_point(self.intrinsics,
+                                                                  [float(x_coord),
+                                                                   float(y_coord)],
+                                                                  float(z_coord))
+            # log the deprojected point
+            self.get_logger().info(f"Deprojected point: {object_deprojected}")
+            obj_point = Point(x=object_deprojected[1]/1000.0,
+                              y=object_deprojected[0]/1000.0,
+                              z=object_deprojected[2]/1000.0)
+            # log x, y, z
+            self.get_logger().info(f"Sending x: {obj_point.x}, y: {obj_point.y}, z: {obj_point.z} for {prompt}")
+            detected_obj = DetectedObject(object_name=prompt,
+                                          position=obj_point)
             self.bounding_boxes_pub.publish(detected_obj)
         # show the color image with bounding boxes
         cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
@@ -297,7 +314,7 @@ class Vision(Node):
         if self.state == State.IDLE:
             return
         elif self.state == State.SCANNING:
-            if self.color is None or self.depth is None:
+            if self.color is None or self.depth is None or self.intrinsics is None:
                 return
             # cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
             # cv2.imshow(self.window, self.color)

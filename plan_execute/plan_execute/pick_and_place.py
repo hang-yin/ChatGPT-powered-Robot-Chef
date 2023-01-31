@@ -86,7 +86,7 @@ class Pick_And_Place(Node):
         self.timer = self.create_timer(self.timer_period, self.timer_callback, callback_group=self.cbgroup)
 
         # initialize subscription to a custom message that contains the pose of a detected object
-        self.detection_sub = self.create_subscription(DetectedObject, 'detected_object', self.detection_callback, 10)
+        self.detection_sub = self.create_subscription(DetectedObject, '/detected_object', self.detection_callback, 10)
 
         # initialize service
         self.instruction_service = self.create_service(Instruction, '/instruction', self.instruction_callback)
@@ -232,7 +232,8 @@ class Pick_And_Place(Node):
             pick = copy.deepcopy(self.goal_pose)
             pick.position.x = self.pick_targets[self.curr_pick_target].x
             pick.position.y = self.pick_targets[self.curr_pick_target].y
-            pick.position.z = self.pick_targets[self.curr_pick_target].z
+            # pick.position.z = self.pick_targets[self.curr_pick_target].z
+            pick.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=pick,
                                                                              v=0.5,
@@ -266,7 +267,8 @@ class Pick_And_Place(Node):
             place = copy.deepcopy(self.goal_pose)
             place.position.x = self.place_targets[self.curr_place_target].x
             place.position.y = self.place_targets[self.curr_place_target].y
-            place.position.z = self.place_targets[self.curr_place_target].z
+            # place.position.z = self.place_targets[self.curr_place_target].z
+            place.position.z = 0.18
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=place,
                                                                              v=0.5,
@@ -375,9 +377,17 @@ class Pick_And_Place(Node):
         Callback function for the detection subscription.
         """
         object_name = msg.object_name
+        # perform a static transform for the detected object
+        # we want a transform from the camera frame to the hand tcp frame
+        obj_pose = Point()
+        x_offset = 0.477
+        y_offset = -0.037
+        obj_pose.x = msg.position.x + x_offset
+        obj_pose.y = msg.position.y + y_offset
+        obj_pose.z = msg.position.z
         if object_name in self.pick_targets.keys():
-            self.pick_targets[object_name] = msg.position
-            self.get_logger().info('Received pose of ' + object_name + ' at ' + str(msg.position))
+            self.pick_targets[object_name] = obj_pose
+            self.get_logger().info('Received pose of ' + object_name + ' at ' + str(obj_pose))
         elif object_name in self.place_targets.keys():
             self.place_targets[object_name] = msg.position
     
@@ -391,7 +401,7 @@ class Pick_And_Place(Node):
         return response
 
 def pick_and_place_entry():
-    openai_api_key = ""
+    openai_api_key = "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"
     openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
