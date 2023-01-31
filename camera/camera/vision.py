@@ -19,6 +19,7 @@ import matplotlib.patches
 import matplotlib.pyplot as plt
 import torch
 from torchvision import transforms
+from PIL import Image as PILImage
 from transformers import CLIPProcessor, CLIPModel
 from plan_execute_interface.msg import DetectedObject
 
@@ -47,16 +48,18 @@ class CLIP():
     TODO: Add class docstring
     """
 
-    def __init__(self, color_image):
+    def __init__(self, color_image, node):
         # CLIP related parameters
-        self.processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
-        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
+        model_id = "openai/clip-vit-base-patch32"
+        self.processor = CLIPProcessor.from_pretrained(model_id)
+        self.model = CLIPModel.from_pretrained(model_id)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         self.patch_size = 32
         self.window_size = 3
         self.threshold = 0.8
         self.color_img = color_image
+        self.node = node
     
     def get_patches(self):
         # add extra dimension for later calculations
@@ -97,8 +100,9 @@ class CLIP():
         # calculate average scores
         scores /= runs
         # clip scores
-        for _ in range(3):
-            scores = np.clip(scores-scores.mean(), 0, np.inf)
+        scores = np.clip(scores-scores.mean(), 0, np.inf)
+        #for _ in range(3):
+        #    scores = np.clip(scores-scores.mean(), 0, np.inf)
         # normalize scores
         scores = (scores - scores.min()) / (scores.max() - scores.min())
         # create a tensor of zeros with the same shape as scores
@@ -123,22 +127,28 @@ class CLIP():
         height = y_max - y_min
         width = x_max - x_min
         return x_min, y_min, width, height
-    
-    def detect(self, prompts, stride=1):
+
+    def detect(self, prompts):
         # build image patches for detection
         img_patches = self.get_patches()
         # only consider the bottom half of the image
         # img_patches = img_patches[:, img_patches.shape[1]//2:, :, :, :]
         # convert image to format for displaying with matplotlib
-        image = np.moveaxis(self.color_img.data.numpy(), 0, -1)
+        # image = np.moveaxis(self.color_img.data.numpy(), 0, -1)
         # initialize plot to display image + bounding boxes
         # fig, ax = plt.subplots(figsize=(Y*0.5, X*0.5))
         # ax.imshow(image)
         # return a list of x, y, width, height, and prompt for each bounding box
         boxes = []
         # process image through object detection steps
-        for i, prompt in enumerate(tqdm(prompts)):
+        for prompt in tqdm(prompts):
+            # log prompt
+            self.node.get_logger().info(f'Processing prompt: {prompt}')
             scores = self.get_scores(img_patches, prompt)
+            # log scores
+            self.node.get_logger().info(f'Scores: {scores}')
+            # log score shape
+            self.node.get_logger().info(f'Score shape: {scores.shape}')
             x, y, width, height = self.get_box(scores)
             boxes.append(BoundingBox(x, y, width, height, prompt))
         return boxes
@@ -187,7 +197,9 @@ class Vision(Node):
 
         self.window = "Bounding boxes on color image"
 
-        self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
+        # self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
+        # self.prompts = ["carrot", "green beans", "yellow pepper"]
+        self.prompts = ["carrot"]
 
         self.object_frame = TransformStamped()
         self.object_frame.header.frame_id = 'camera_link'
@@ -240,13 +252,23 @@ class Vision(Node):
     def scan(self):
         # take self.color to do CLIP
         # convert self.color to a tensor of shape [3, height, width]
-        color_tensor = torch.tensor(self.color).permute(2, 0, 1).unsqueeze(0).float()
-        # get rid of the first dimension of color_tensor
-        color_tensor = color_tensor.squeeze(0)
+        pil_image = PILImage.fromarray(self.color)
+        color_tensor = transforms.ToTensor()(pil_image)
         # log the shape of the color tensor
-        # self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
+        self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
+        """
+        # log shape of self.color
+        self.get_logger().info(f"Color image shape: {self.color.shape}")
+        color_tensor = torch.tensor(self.color).permute(2, 0, 1).float()
+        # convert values to be between 0 and 1
+        color_tensor = color_tensor / 255
+        # log the shape of the color tensor
+        self.get_logger().info(f"Color tensor shape: {color_tensor.shape}")
+        # log the entire color tensor
+        self.get_logger().info(f"Color tensor: {color_tensor}")
+        """
         # initialize a CLIP model
-        clip_model = CLIP(color_tensor)
+        clip_model = CLIP(color_tensor, self)
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
