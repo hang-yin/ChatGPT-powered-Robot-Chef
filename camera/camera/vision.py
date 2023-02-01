@@ -198,11 +198,14 @@ class Vision(Node):
 
         # self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
         # self.prompts = ["carrot", "green beans", "yellow pepper"]
-        self.prompts = ["banana", "eggplant", "apple"]
+        self.prompts = ["banana", "eggplant", "strawberry", "green beans"]
+        # self.prompts = ["banana", "strawberry"]
         # self.prompts = ["carrot"]
 
         self.object_frame = TransformStamped()
         self.object_frame.header.frame_id = 'camera_link'
+
+        self.detected_objects = []
 
 
     def info_callback(self, cameraInfo):
@@ -230,6 +233,8 @@ class Vision(Node):
         """Store the color image."""
         try:
             self.color = self.bridge.imgmsg_to_cv2(color, "bgr8")
+            # flip image
+            self.color = cv2.flip(self.color, 0)
         except CvBridgeError:
             self.get_logger().info("Getting color image failed?")
             return
@@ -302,9 +307,11 @@ class Vision(Node):
             detected_obj = DetectedObject(object_name=prompt,
                                           position=obj_point)
             self.bounding_boxes_pub.publish(detected_obj)
+            self.detected_objects.append(detected_obj)
         # show the color image with bounding boxes
         cv2.namedWindow(self.window, cv2.WINDOW_AUTOSIZE)
         self.draw_bounding_boxes(bounding_boxes)
+        # flip self.color
         cv2.imshow(self.window, self.color)
         cv2.waitKey(0)
 
@@ -312,6 +319,13 @@ class Vision(Node):
         # log state
         self.get_logger().info(f"State: {self.state}")
         if self.state == State.IDLE:
+            """
+            for obj in self.detected_objects:
+                self.bounding_boxes_pub.publish(obj)
+            # continue to show the color image
+            cv2.imshow(self.window, self.color)
+            cv2.waitKey(1)
+            """
             return
         elif self.state == State.SCANNING:
             if self.color is None or self.depth is None or self.intrinsics is None:

@@ -51,20 +51,25 @@ class Targets(Enum):
 
 GPT_CONTEXT = """
 # move all fruits and vegetables to the top left corner.
-robot.pick_and_place(apple, top left corner)
-robot.pick_and_place(eggplant, top left corner)
+robot.pick_and_place(strawberry, top left corner)
 robot.pick_and_place(banana, top left corner)
+robot.pick_and_place(eggplant, top left corner)
 robot.pick_and_place(green beans, top left corner)
 done()
 
 # put the fruits in the top right corner.
-robot.pick_and_place(apple, top right corner)
+robot.pick_and_place(strawberry, top right corner)
 robot.pick_and_place(banana, top right corner)
 done()
 
 # move the vegetables to the middle.
 robot.pick_and_place(eggplant, middle)
 robot.pick_and_place(green beans, middle)
+done()
+
+# move the fruits to the middle.
+robot.pick_and_place(strawberry, middle)
+robot.pick_and_place(banana, middle)
 done()
 
 # move the vegetables to the basket.
@@ -93,17 +98,18 @@ class Pick_And_Place(Node):
 
         # create a dictionary with pick/place targets as keys and their corresponding poses as values
         self.pick_targets = {
-            "apple": Point(x=0.397, y=0.275, z=0.04),
+            "strawberry": Point(x=0.397, y=0.275, z=0.04),
             "banana": Point(x=0.465, y=0.0, z=0.030),
             "eggplant": Point(x=0.465, y=0.0, z=0.032),
-            "green beans": Point(),
+            "green beans": Point(x=0.465, y=0.0, z=0.032),
         }
 
         self.pick_widths = {
             "apple": 0.06,
-            "banana": 0.07,
+            "banana": 0.03,
             "eggplant": 0.08,
             "green beans": 0.07,
+            "strawberry": 0.04,
         }
 
         self.place_targets = {
@@ -112,7 +118,7 @@ class Pick_And_Place(Node):
             "middle": Point(x=0.5, y=0.0, z=0.0),
             "bottom left corner": Point(x=0.5, y=0.5, z=0.0),
             "bottom right corner": Point(x=0.5, y=-0.5, z=0.0),
-            "basket": Point(x=0.35, y=-0.21, z=0.18),
+            "basket": Point(x=0.3, y=-0.23, z=0.18),
         }
     
         self.current_state = State.START
@@ -233,7 +239,7 @@ class Pick_And_Place(Node):
             pick.position.x = self.pick_targets[self.curr_pick_target].x
             pick.position.y = self.pick_targets[self.curr_pick_target].y
             # pick.position.z = self.pick_targets[self.curr_pick_target].z
-            pick.position.z = 0.18
+            pick.position.z = 0.028
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=pick,
                                                                              v=0.5,
@@ -380,9 +386,9 @@ class Pick_And_Place(Node):
         # perform a static transform for the detected object
         # we want a transform from the camera frame to the hand tcp frame
         obj_pose = Point()
-        x_offset = 0.477
-        y_offset = -0.037
-        obj_pose.x = msg.position.x + x_offset
+        x_offset = 0.3064 - 0.065 + 0.134
+        y_offset = -0.04
+        obj_pose.x = -msg.position.x + x_offset
         obj_pose.y = msg.position.y + y_offset
         obj_pose.z = msg.position.z
         if object_name in self.pick_targets.keys():
@@ -401,7 +407,7 @@ class Pick_And_Place(Node):
         return response
 
 def pick_and_place_entry():
-    openai_api_key = "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"
+    openai_api_key = "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"
     openai.api_key = openai_api_key
     rclpy.init()
     pick_and_place = Pick_And_Place()
