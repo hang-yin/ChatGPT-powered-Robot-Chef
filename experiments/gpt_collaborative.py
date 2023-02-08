@@ -43,7 +43,7 @@ Menu:
 
 openai_api_key = input("Enter your OpenAI API key: ")
 openai.api_key = openai_api_key
-# ENGINE = "text-davinci-001"
+# ENGINE = "text-davinci-003"
 ENGINE = "text-ada-001"
 
 PICK_TARGETS = {
