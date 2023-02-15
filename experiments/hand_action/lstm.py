@@ -2,6 +2,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import multilabel_confusion_matrix, accuracy_score
 import os
 import numpy as np
 import pandas as pd
@@ -72,4 +73,11 @@ model.load_weights('action.h5')
 """
 ----------------Model Evaluation----------------
 """
+yhat = model.predict(X_test)
+ytrue = np.argmax(y_test, axis=1).tolist()
+yhat = np.argmax(yhat, axis=1).tolist()
+# print confusion matrix
+print(multilabel_confusion_matrix(ytrue, yhat))
+# print accuracy
+print(accuracy_score(ytrue, yhat))
 
