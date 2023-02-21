@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import time
 import pandas as pd
 import mediapipe as mp
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.utils import to_categorical
@@ -20,7 +20,7 @@ class HandTracking():
                  no_sequence=60,
                  sequence_length=45,
                  start_folder=1,
-                 actions=['grabbing', 'cutting', 'else']):
+                 actions=['grabbing', 'cutting']):
         self.data_path = os.path.join(data_path)
         # Thirty videos worth of data
         self.no_sequence = no_sequence
@@ -205,7 +205,7 @@ class HandTracking():
         self.model.evaluate(self.X_test, self.y_test)
     
     def load_model(self):
-        self.model.load_model('hand_activity_model.h5')
+        self.model = load_model('hand_activity_model.h5')
 
     def prob_viz(self, res, actions, input_frame, colors):
         output_frame = input_frame.copy()
@@ -294,11 +294,16 @@ class HandTracking():
 if __name__ == "__main__":
     hand_activity = HandTracking()
     hand_activity.realsense_setup()
-    hand_activity.data_preprocessing()
-    hand_activity.train_model(epochs=10)
-    hand_activity.evaluate_model()
+    
+    # hand_activity.data_preprocessing()
+    # hand_activity.train_model(epochs=10)
+    # hand_activity.evaluate_model()
+    
     # hand_activity.collect_data('grabbing')
     # hand_activity.show_example_video('grabbing', 10)
+
+    hand_activity.load_model()
+    hand_activity.predict_in_real_time()
     """
     # Load the npy file
     my_array = np.load('data/grabbing/20/0.npy')

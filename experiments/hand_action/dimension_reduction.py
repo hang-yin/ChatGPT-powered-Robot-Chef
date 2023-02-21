@@ -19,7 +19,8 @@ y_train = None
 y_test = None
 
 # loading data
-actions=['grabbing', 'cutting', 'else']
+# actions=['grabbing', 'cutting', 'else']
+actions=['grabbing', 'cutting']
 data_path='data'
 no_sequence=60
 sequence_length=45
@@ -37,6 +38,8 @@ for action in actions:
 
 X = np.array(sequences)
 print(X.shape)
+
+"""
 # x shape is (180, 45, 126)
 # cut half of the data so that x shape is (180, 45, 63)
 X = X[:, :, :63]
@@ -52,14 +55,23 @@ def euclidean_distance(x1, y1, z1, x2, y2, z2):
 # reshape X to (180, 45, 21, 3)
 X = X.reshape(X.shape[0], X.shape[1], 21, 3)
 
-Xnew = np.zeros((X.shape[0], X.shape[1], 20))
+Xnew = np.zeros((X.shape[0], X.shape[1], 21))
+
 for i in range(X.shape[0]):
     for j in range(X.shape[1]):
-        for k in range(20):
-            Xnew[i, j, k] = euclidean_distance(X[i, j, 0, 0], X[i, j, 0, 1], X[i, j, 0, 2], X[i, j, k+1, 0], X[i, j, k+1, 1], X[i, j, k+1, 2])
+        for k in range(21):
+            if (k < 20):
+                Xnew[i, j, k] = euclidean_distance(X[i, j, 0, 0], X[i, j, 0, 1], X[i, j, 0, 2], X[i, j, k+1, 0], X[i, j, k+1, 1], X[i, j, k+1, 2])
+            else:
+                # the last data point is the distance from the current wrist point to the previous wrist point
+                # if this is the first wrist point, then the distance is 0
+                if (j == 0):
+                    Xnew[i, j, k] = 0
+                else:
+                    Xnew[i, j, k] = euclidean_distance(X[i, j, 0, 0], X[i, j, 0, 1], X[i, j, 0, 2], X[i, j-1, 0, 0], X[i, j-1, 0, 1], X[i, j-1, 0, 2])
 
 X = Xnew
-
+"""
 print(X.shape)
 
 y = to_categorical(labels).astype(int)
@@ -74,7 +86,7 @@ log_dir = os.path.join("Logs")
 tb_callback = TensorBoard(log_dir=log_dir)
 
 model = Sequential()
-model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(sequence_length,20)))
+model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(sequence_length,126)))
 model.add(LSTM(128, return_sequences=True, activation='relu'))
 model.add(LSTM(64, return_sequences=False, activation='relu'))
 model.add(Dense(64, activation='relu'))
