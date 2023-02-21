@@ -36,5 +36,55 @@ for action in actions:
         labels.append(label_map[action])
 
 X = np.array(sequences)
+print(X.shape)
+# x shape is (180, 45, 126)
+# cut half of the data so that x shape is (180, 45, 63)
+X = X[:, :, :63]
+
+# define euclidean distance function that takes in 3D points
+def euclidean_distance(x1, y1, z1, x2, y2, z2):
+    return np.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
+
+# the third dimension of X is 63, which is 21 3D points(xyz coordinates)
+# we want to calculate the euclidean distance of all 20 points to the first point(wrist)
+# so we need to reshape the third dimension to 20 3D points
+
+# reshape X to (180, 45, 21, 3)
+X = X.reshape(X.shape[0], X.shape[1], 21, 3)
+
+Xnew = np.zeros((X.shape[0], X.shape[1], 20))
+for i in range(X.shape[0]):
+    for j in range(X.shape[1]):
+        for k in range(20):
+            Xnew[i, j, k] = euclidean_distance(X[i, j, 0, 0], X[i, j, 0, 1], X[i, j, 0, 2], X[i, j, k+1, 0], X[i, j, k+1, 1], X[i, j, k+1, 2])
+
+X = Xnew
+
+print(X.shape)
+
 y = to_categorical(labels).astype(int)
+print(y.shape)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
+
+
+
+
+
+log_dir = os.path.join("Logs")
+tb_callback = TensorBoard(log_dir=log_dir)
+
+model = Sequential()
+model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(sequence_length,20)))
+model.add(LSTM(128, return_sequences=True, activation='relu'))
+model.add(LSTM(64, return_sequences=False, activation='relu'))
+model.add(Dense(64, activation='relu'))
+model.add(Dense(32, activation='relu'))
+model.add(Dense(len(actions), activation='softmax'))
+
+model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+model.fit(X_train, y_train, epochs=20, callbacks=[tb_callback])
+model.summary()
+# save model
+model.save('hand_activity_model.h5')
+
+model.evaluate(X_test, y_test)
