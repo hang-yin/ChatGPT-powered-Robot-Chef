@@ -17,10 +17,10 @@ import pyrealsense2 as rs
 class HandTracking():
     def __init__(self,
                  data_path='data',
-                 no_sequence=30,
-                 sequence_length=120,
+                 no_sequence=60,
+                 sequence_length=45,
                  start_folder=1,
-                 actions=['grabbing', 'releasing', 'cutting', 'else']):
+                 actions=['grabbing', 'cutting', 'else']):
         self.data_path = os.path.join(data_path)
         # Thirty videos worth of data
         self.no_sequence = no_sequence
@@ -188,12 +188,12 @@ class HandTracking():
         tb_callback = TensorBoard(log_dir=log_dir)
 
         self.model = Sequential()
-        self.model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(self.sequence_length,63)))
+        self.model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(self.sequence_length,126)))
         self.model.add(LSTM(128, return_sequences=True, activation='relu'))
         self.model.add(LSTM(64, return_sequences=False, activation='relu'))
         self.model.add(Dense(64, activation='relu'))
         self.model.add(Dense(32, activation='relu'))
-        self.model.add(Dense(self.actions.shape[0], activation='softmax'))
+        self.model.add(Dense(len(self.actions), activation='softmax'))
 
         self.model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
         self.model.fit(self.X_train, self.y_train, epochs=epochs, callbacks=[tb_callback])
@@ -294,7 +294,10 @@ class HandTracking():
 if __name__ == "__main__":
     hand_activity = HandTracking()
     hand_activity.realsense_setup()
-    hand_activity.collect_data('grabbing')
+    hand_activity.data_preprocessing()
+    hand_activity.train_model(epochs=10)
+    hand_activity.evaluate_model()
+    # hand_activity.collect_data('grabbing')
     # hand_activity.show_example_video('grabbing', 10)
     """
     # Load the npy file
