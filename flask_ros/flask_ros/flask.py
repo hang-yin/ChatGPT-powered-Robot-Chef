@@ -16,7 +16,7 @@ pre_prompt = """Given the following context, what follows after this statement "
 
 
 post_prompt = """
-"? 
+"?  Follow the syntax of the below context and only output statements that either start with robot.pick_and_place or human.cut or done()
 
 Context: 
 
