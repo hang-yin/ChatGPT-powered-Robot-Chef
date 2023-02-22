@@ -22,17 +22,20 @@ mp_hands = mp.solutions.hands
 
 actions = ['grabbing', 'cutting']
 colors = [(245,117,16), (117,245,16), (16,117,245)]
-threshold = 0.5
+threshold = 0.8
 
 def extract_keypoints(self, results):
     lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
     rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
     return np.concatenate([lh, rh])
 
-def prob_viz(res, actions, input_frame, colors):
+def prob_viz(res, action, actions, input_frame, colors):
     output_frame = input_frame.copy()
     for num, prob in enumerate(res):
-        cv2.rectangle(output_frame, (0,60+num*40), (int(prob*100), 90+num*40), colors[num], -1)
+        if (prob > 0.5):
+            cv2.rectangle(output_frame, (0,60+num*40), (150, 90+num*40), colors[num], -1)
+        else:
+            cv2.rectangle(output_frame, (0,60+num*40), (0, 90+num*40), colors[num], -1)
         cv2.putText(output_frame, actions[num], (0, 85+num*40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
     return output_frame
 
@@ -77,14 +80,10 @@ def main():
             if not hand_result:
                 continue
 
-            result_np_array = np.zeros((2, 63))
-            if len(hand_result) == 1:
-                result_np_array[0] = np.array([[res.x, res.y, res.z] for res in hand_result[0].landmark]).flatten()
-            elif len(hand_result) == 2:
-                result_np_array[0] = np.array([[res.x, res.y, res.z] for res in hand_result[0].landmark]).flatten()
-                result_np_array[1] = np.array([[res.x, res.y, res.z] for res in hand_result[1].landmark]).flatten()
+            result_np_array = np.zeros((1, 63))
+            result_np_array[0] = np.array([[res.x, res.y, res.z] for res in hand_result[0].landmark]).flatten()
 
-            result_np_array = result_np_array.reshape(126) # 126 np array
+            result_np_array = result_np_array.reshape(63) # 126 np array
 
             for hand_landmarks in hand_result:
                 mp_drawing.draw_landmarks(image, 
@@ -97,6 +96,8 @@ def main():
             sequence = sequence[-sequence_length:]
             if len(sequence) == sequence_length:
                 res = model.predict(np.expand_dims(sequence, axis=0))[0]
+                # print out probabilities for each action
+                # print(res)
                 print(actions[np.argmax(res)])
                 predictions.append(np.argmax(res))
                 if np.unique(predictions[-10:])[0]==np.argmax(res): 
@@ -111,7 +112,7 @@ def main():
                     sentence = sentence[-5:]
 
                 # Viz probabilities
-                image = prob_viz(res, actions, image, colors)
+                image = prob_viz(res, actions[np.argmax(res)], actions, image, colors)
             
             cv2.rectangle(image, (0,0), (640, 40), (245, 117, 16), -1)
             cv2.putText(image, ' '.join(sentence), (3,30), 

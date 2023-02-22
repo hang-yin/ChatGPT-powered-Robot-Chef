@@ -73,6 +73,8 @@ for i in range(X.shape[0]):
 X = Xnew
 """
 print(X.shape)
+# cut half of the data so that x shape is (180, 45, 63)
+X = X[:, :, :63]
 
 y = to_categorical(labels).astype(int)
 print(y.shape)
@@ -86,7 +88,7 @@ log_dir = os.path.join("Logs")
 tb_callback = TensorBoard(log_dir=log_dir)
 
 model = Sequential()
-model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(sequence_length,126)))
+model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(sequence_length,63)))
 model.add(LSTM(128, return_sequences=True, activation='relu'))
 model.add(LSTM(64, return_sequences=False, activation='relu'))
 model.add(Dense(64, activation='relu'))
