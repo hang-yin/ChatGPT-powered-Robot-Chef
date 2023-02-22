@@ -17,6 +17,12 @@ def generate_launch_description():
         output='screen',
     )
 
+    hand_action_node = Node(
+        package='camera',
+        executable='hand_action',
+        output='screen',
+    )
+
     launch_realsense = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
@@ -31,5 +37,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         launch_realsense,
-        vision_node
+        vision_node,
+        hand_action_node,
     ])

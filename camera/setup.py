@@ -23,7 +23,8 @@ setup(
     # TODO: add entry points here
     entry_points={
         'console_scripts': [
-            'vision = camera.vision:main'
+            'vision = camera.vision:main',
+            'hand_action = camera.hand_action:main',
         ],
     },
 )
