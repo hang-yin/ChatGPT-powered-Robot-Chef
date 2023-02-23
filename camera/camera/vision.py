@@ -210,6 +210,7 @@ class HandActionPrediction():
             # Break gracefully
             if cv2.waitKey(10) & 0xFF == ord('q'):
                 return
+        return self.predictions[-1] if len(self.predictions) > 0 else None
 
 
 
@@ -282,7 +283,8 @@ class Vision(Node):
     def start_action_scan_callback(self, msg):
         if msg.data:
             self.state = State.ACTION_SCAN
-
+        else:
+            self.state = State.IDLE
 
     def info_callback(self, cameraInfo):
         """Store the intrinsics of the camera."""
@@ -414,8 +416,11 @@ class Vision(Node):
         elif self.state == State.ACTION_SCAN:
             if self.color is None or self.depth is None or self.intrinsics is None:
                 return
-            self.hand_action_classifier.predict(self.color)
-            # get the predicted action and send over to motion node
+            prediction = self.hand_action_classifier.predict(self.color)
+            if prediction is not None:
+                self.get_logger().info(f"Prediction: {prediction}")
+                self.hand_action_pub.publish(prediction)
+                
 
 def main(args=None):
     """Start and spin the node."""
