@@ -21,12 +21,15 @@ from torchvision import transforms
 from PIL import Image as PILImage
 from transformers import CLIPProcessor, CLIPModel
 from plan_execute_interface.msg import DetectedObject
+import mediapipe as mp
+from tensorflow.keras.models import load_model
 
 class State(Enum):
     """The current state of the scan."""
     IDLE = auto()
     SCANNING = auto()
     PUBLISH_OBJECTS = auto()
+    ACTION_SCAN = auto()
 
 
 class BoundingBox():
@@ -152,6 +155,63 @@ class CLIP():
             boxes.append(BoundingBox(x, y, width, height, prompt))
         return boxes
 
+class HandActionPrediction():
+    def __init__(self):
+        self.model = load_model('hand_activity_model.h5')
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.mp_pose = mp.solutions.pose
+        self.mp_hands = mp.solutions.hands
+        self.actions = ['grabbing', 'cutting']
+        self.colors = [(245,117,16), (117,245,16), (16,117,245)]
+        self.threshold = 0.8
+        self.hands = self.mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+        self.sequence_length = 45
+        self.sentence = []
+        self.predictions = []
+        self.actions = ['grabbing', 'cutting']
+
+    def prob_viz(self, res, actions, input_frame, colors):
+        output_frame = input_frame.copy()
+        for num, prob in enumerate(res):
+            if (prob > 0.5):
+                cv2.rectangle(output_frame, (0,60+num*40), (150, 90+num*40), colors[num], -1)
+            else:
+                cv2.rectangle(output_frame, (0,60+num*40), (0, 90+num*40), colors[num], -1)
+            cv2.putText(output_frame, actions[num], (0, 85+num*40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+        return output_frame
+    
+    def predict(self, frame):
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image.flags.writeable = False
+        results = self.hands.process(image)
+        image.flags.writeable = True
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        hand_result = results.multi_hand_landmarks
+        if hand_result:
+            result_np_array = np.zeros((1,63))
+            result_np_array[0] = np.array([[res.x, res.y, res.z] for res in hand_result[0].landmark]).flatten()
+            result_np_array = result_np_array.reshape(63)
+            for hand_landmarks in hand_result:
+                self.mp_drawing.draw_landmarks(image, 
+                                               hand_landmarks,
+                                               self.mp_hands.HAND_CONNECTIONS,
+                                               self.mp_drawing.DrawingSpec(color=(121,22,76), thickness=2, circle_radius=4), 
+                                               self.mp_drawing.DrawingSpec(color=(121,44,250), thickness=2, circle_radius=2))
+            self.sequence.append(result_np_array)
+            self.sequence = self.sequence[-self.sequence_length:]
+            if len(self.sequence) == self.sequence_length:
+                res = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
+                self.predictions.append(np.argmax(res))
+                image = self.prob_viz(res, self.actions, image, self.colors)
+            
+            # Show to screen
+            cv2.imshow('Hand Action', image)
+
+            # Break gracefully
+            if cv2.waitKey(10) & 0xFF == ord('q'):
+                return
+
+
 
 class Vision(Node):
     """
@@ -206,6 +266,22 @@ class Vision(Node):
         self.object_frame.header.frame_id = 'camera_link'
 
         self.detected_objects = []
+
+        # create subscriber for a Bool from /start_action_scan topic
+        self.start_action_scan_sub = self.create_subscription(Bool,
+                                                              '/start_action_scan',
+                                                              self.start_action_scan_callback,
+                                                              10)
+
+        # create publisher for a Bool to /hand_action topic
+        # 0 indicates grabbing, 1 indicates cutting
+        self.hand_action_pub = self.create_publisher(Bool, '/hand_action', 10)
+
+        self.hand_action_classifier = HandActionPrediction()
+    
+    def start_action_scan_callback(self, msg):
+        if msg.data:
+            self.state = State.ACTION_SCAN
 
 
     def info_callback(self, cameraInfo):
@@ -335,6 +411,11 @@ class Vision(Node):
             # cv2.waitKey(0)
             self.scan()
             self.state = State.IDLE
+        elif self.state == State.ACTION_SCAN:
+            if self.color is None or self.depth is None or self.intrinsics is None:
+                return
+            self.hand_action_classifier.predict(self.color)
+            # get the predicted action and send over to motion node
 
 def main(args=None):
     """Start and spin the node."""
