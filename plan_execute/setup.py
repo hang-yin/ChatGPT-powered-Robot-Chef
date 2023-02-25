@@ -25,6 +25,7 @@ setup(
             'simple_move=plan_execute.simple_move:test_entry',
             'cv_test=plan_execute.cv_test:test_entry',
             'pick_and_place=plan_execute.pick_and_place:pick_and_place_entry',
+            'motion=plan_execute.motion:motion_entry',
         ],
     },
 )
