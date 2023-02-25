@@ -12,7 +12,7 @@ from geometry_msgs.msg import Pose, Point
 from math import dist
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
-from std_msgs.msg import Bool, Int16
+from std_msgs.msg import Bool, Int16, Int64
 from ament_index_python.packages import get_package_share_path
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
@@ -157,7 +157,6 @@ class CLIP():
 
 class HandActionPrediction():
     def __init__(self):
-        self.model = load_model('hand_activity_model.h5')
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
         self.mp_hands = mp.solutions.hands
@@ -166,9 +165,12 @@ class HandActionPrediction():
         self.threshold = 0.8
         self.hands = self.mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
         self.sequence_length = 45
-        self.sentence = []
+        self.sequence = []
         self.predictions = []
         self.actions = ['grabbing', 'cutting']
+    
+    def load_model(self, model_path):
+        self.model = load_model(model_path)
 
     def prob_viz(self, res, actions, input_frame, colors):
         output_frame = input_frame.copy()
@@ -205,14 +207,13 @@ class HandActionPrediction():
                 image = self.prob_viz(res, self.actions, image, self.colors)
             
             # Show to screen
+            cv2.namedWindow('Hand Action', cv2.WINDOW_AUTOSIZE)
             cv2.imshow('Hand Action', image)
 
             # Break gracefully
             if cv2.waitKey(10) & 0xFF == ord('q'):
                 return
         return self.predictions[-1] if len(self.predictions) > 0 else None
-
-
 
 class Vision(Node):
     """
@@ -246,7 +247,7 @@ class Vision(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # set current state
-        self.state = State.SCANNING
+        self.state = State.ACTION_SCAN
 
         # initialize color and depth images
         self.color = None
@@ -276,9 +277,12 @@ class Vision(Node):
 
         # create publisher for a Bool to /hand_action topic
         # 0 indicates grabbing, 1 indicates cutting
-        self.hand_action_pub = self.create_publisher(Bool, '/hand_action', 10)
+        self.hand_action_pub = self.create_publisher(Int64, '/hand_action', 10)
 
         self.hand_action_classifier = HandActionPrediction()
+
+        model_path = get_package_share_path('camera') / 'hand_activity_model.h5'
+        self.hand_action_classifier.load_model(model_path)
     
     def start_action_scan_callback(self, msg):
         if msg.data:
@@ -418,8 +422,12 @@ class Vision(Node):
                 return
             prediction = self.hand_action_classifier.predict(self.color)
             if prediction is not None:
-                self.get_logger().info(f"Prediction: {prediction}")
-                self.hand_action_pub.publish(prediction)
+                # self.get_logger().info(f"Prediction: {prediction}")
+                # initialize a Int64 message
+                msg = Int64()
+                # set the data
+                msg.data = int(prediction)
+                self.hand_action_pub.publish(msg)
                 
 
 def main(args=None):

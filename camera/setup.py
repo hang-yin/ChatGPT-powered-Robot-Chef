@@ -11,7 +11,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml',
-                                   'launch/vision.launch.py']),
+                                   'launch/vision.launch.py',
+                                   'model/hand_activity_model.h5',]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'vision = camera.vision:main',
-            'hand_action = camera.hand_action:main',
         ],
     },
 )
