@@ -5,7 +5,7 @@ from plan_execute_interface.srv import GoHere, Place, Instruction
 from plan_execute_interface.msg import DetectedObject
 from plan_execute.plan_and_execute import PlanAndExecute
 from geometry_msgs.msg import Pose, Point
-from std_msgs.msg import Bool, Int16, Int64
+from std_msgs.msg import Bool, Int16, Int64, String
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from std_srvs.srv import Empty
 import math
@@ -35,6 +35,7 @@ class State(Enum):
     HOME = auto()
     PLACE_PLANE = auto()
     CARTESIAN = auto()
+    HAND_DETECTION = auto()
 
 class Motion(Node):
     """
@@ -50,6 +51,15 @@ class Motion(Node):
 
         # initialize subscription to a custom message that contains the pose of a detected object
         self.detection_sub = self.create_subscription(DetectedObject, '/detected_object', self.detection_callback, 10)
+
+        # initialize subscription to a string message that contains the instruction
+        self.instruction_sub = self.create_subscription(String, '/gpt_instruction', self.instruction_callback, 10)
+
+        # initialize publisher to publish a Bool to /start_action_scan topic
+        self.start_action_scan_pub = self.create_publisher(Bool, '/start_action_scan', 10)
+
+        # initialize subscription to a Int64 message that tells the current hand action
+        self.hand_action_sub = self.create_subscription(Int64, '/hand_action', self.hand_action_callback, 10)
 
         # create a dictionary with pick/place targets as keys and their corresponding poses as values
         self.pick_targets = {
@@ -84,7 +94,6 @@ class Motion(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.curr_instruction = None
-        self.gpt_context = None
 
         self.steps = []
         self.curr_pick_target = None
@@ -110,6 +119,22 @@ class Motion(Node):
         self.home_pose.orientation.y = 0.0
         self.home_pose.orientation.z = 0.0
         self.home_pose.orientation.w = 0.0
+    
+    def instruction_callback(self, msg):
+        """
+        Callback function for the instruction subscription.
+        """
+        self.curr_instruction = msg.data
+        self.current_state = State.INTERPRET_INSTRUCTION
+    
+    def hand_action_callback(self, msg):
+        """
+        Callback function for the hand action subscription.
+        """
+        if msg.data == 0:
+            return
+        elif msg.data == 1:
+            self.current_state = State.PICK_READY
 
     def cart_callback(self, request, response):
         """
@@ -142,27 +167,15 @@ class Motion(Node):
             return
         elif self.current_state == State.INTERPRET_INSTRUCTION:
             termination_string = "done()"
-            gpt3_prompt = self.gpt_context + "\n#" + self.curr_instruction + "\n"
-            # self.get_logger().info("GPT3 prompt: " + gpt3_prompt)
-            options = self.make_options(termination_string=termination_string)
-            num_tasks = 0
-            max_tasks = 5
             selected_task = ""
-            steps_text = []
-            engine = "text-ada-001"
-            while not selected_task == termination_string:
-                num_tasks += 1
-                if num_tasks > max_tasks:
-                    break
-                llm_scores, _ = self.gpt3_scoring(gpt3_prompt, options, verbose=True, engine=engine, print_tokens=False)
-                selected_task = max(llm_scores, key=llm_scores.get)
-                steps_text.append(selected_task)
-                self.get_logger().info("#" + str(num_tasks) + " selected task: " + selected_task)
-                # print(num_tasks, "Selecting: ", selected_task)
-                gpt3_prompt += selected_task + "\n"
-            self.steps = steps_text
-            self.get_logger().info("Done with instruction: " + self.curr_instruction)
-            for i, step in enumerate(steps_text):
+            # break current instruction into lines
+            temp_steps = self.curr_instruction.splitlines()
+            # get rid of empty lines and lines that don't start with "robot", "human", or "done()"
+            self.steps = [step for step in temp_steps if step != ''
+                                                         and (step.startswith("robot")
+                                                         or step.startswith("human")
+                                                         or step.startswith(termination_string))]
+            for i, step in enumerate(self.steps):
                 if step == '' or step == termination_string:
                     break
                 self.get_logger().info("Step " + str(i) + ": " + step)
@@ -172,6 +185,11 @@ class Motion(Node):
                 self.get_logger().info("Done executing instruction")
                 self.steps.pop(0)
                 self.current_state = State.HOME
+                return
+            # while first step starts with "human", we pop and go to HAND_DETECTION state
+            while self.steps[0].startswith("human"):
+                self.steps.pop(0)
+                self.current_state = State.HAND_DETECTION
                 return
             # self.curr_pick_target = self.steps[0].split()[0]
             split = self.steps[0][21:-1].split(', ')
@@ -262,6 +280,11 @@ class Motion(Node):
                                                                              end_pose=self.home_pose,
                                                                              v=0.5,
                                                                              execute=True)
+            self.current_state = State.IDLE
+        elif self.current_state == State.HAND_DETECTION:
+            msg = Bool()
+            msg.data = True
+            self.hand_detection_pub.publish(msg)
             self.current_state = State.IDLE
     
     async def place_plane(self):
