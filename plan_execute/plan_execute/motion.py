@@ -119,6 +119,8 @@ class Motion(Node):
         self.home_pose.orientation.y = 0.0
         self.home_pose.orientation.z = 0.0
         self.home_pose.orientation.w = 0.0
+
+        self.started_cutting = False
     
     def instruction_callback(self, msg):
         """
@@ -132,9 +134,13 @@ class Motion(Node):
         Callback function for the hand action subscription.
         """
         if msg.data == 0:
-            return
+            if not self.started_cutting:
+                return
+            else:
+                self.started_cutting = False
+                self.current_state = State.PICK_READY
         elif msg.data == 1:
-            self.current_state = State.PICK_READY
+            self.started_cutting = True
 
     def cart_callback(self, request, response):
         """
@@ -187,8 +193,9 @@ class Motion(Node):
                 self.current_state = State.HOME
                 return
             # while first step starts with "human", we pop and go to HAND_DETECTION state
-            while self.steps[0].startswith("human"):
-                self.steps.pop(0)
+            if self.steps[0].startswith("human"):
+                while self.steps[0].startswith("human"):
+                    self.steps.pop(0)
                 self.current_state = State.HAND_DETECTION
                 return
             # self.curr_pick_target = self.steps[0].split()[0]

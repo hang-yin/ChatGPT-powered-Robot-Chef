@@ -80,6 +80,8 @@ class FlaskNode(Node):
         super().__init__('my_node')
         self.app = Flask(__name__)
 
+        self.steps_ready = False
+
         # define Flask routes here
         @self.app.route('/')
         def homepage():
@@ -114,11 +116,18 @@ class FlaskNode(Node):
                 else:
                     response = {"message": gpt_response}
                     gpt_response = None
+                    self.steps_ready = True
                     return jsonify(response)
 
         # start Flask app on a separate thread
         self.app_thread = threading.Thread(target=self.app.run)
         self.app_thread.start()
+
+        # initialize a publisher to /gpt_instruction topic with String message type
+        self.instruction_publisher_ = self.create_publisher(String, 'gpt_instruction', 10)
+
+        # initialize a timer
+        self.timer = self.create_timer(0.5, self.timer_callback)
     
     def gpt_call(self, prompt):
         bot = ChatGPT()
@@ -126,6 +135,13 @@ class FlaskNode(Node):
         # store the response in the global variable
         global gpt_response
         gpt_response = response
+
+    def timer_callback(self):
+        if self.steps_ready:
+            msg = String()
+            msg.data = gpt_response
+            self.instruction_publisher_.publish(msg)
+            self.steps_ready = False
 
     def __del__(self):
         # stop Flask app when node is destroyed
