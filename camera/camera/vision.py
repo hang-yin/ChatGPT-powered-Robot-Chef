@@ -50,7 +50,7 @@ class CLIP():
     TODO: Add class docstring
     """
 
-    def __init__(self, color_image, node):
+    def __init__(self, color_image, depth_image, table_height, node):
         # CLIP related parameters
         model_id = "openai/clip-vit-base-patch32"
         self.processor = CLIPProcessor.from_pretrained(model_id)
@@ -61,6 +61,8 @@ class CLIP():
         self.window_size = 3
         self.threshold = 0.8
         self.color_img = color_image
+        self.depth_img = depth_image
+        self.table_height = table_height
         self.node = node
     
     def get_patches(self):
@@ -87,6 +89,11 @@ class CLIP():
                 for y in range(self.window_size):
                     for x in range(self.window_size):
                         big_patch[y*self.patch_size:(y+1)*self.patch_size, x*self.patch_size:(x+1)*self.patch_size, :] = patch_batch[y, x].permute(1, 2, 0)
+                
+                # if the mean of corresponding depth patch is greater than the table height, skip the patch
+                if self.depth_img.data[Y:Y+self.window_size, X:X+self.window_size].mean() > self.table_height+0.001:
+                    continue
+
                 inputs = self.processor(
                     images=big_patch, # image trasmitted to the model
                     return_tensors="pt", # return pytorch tensor
@@ -283,6 +290,8 @@ class Vision(Node):
 
         model_path = get_package_share_path('camera') / 'hand_activity_model.h5'
         self.hand_action_classifier.load_model(model_path)
+
+        self.table_height = 0.0
     
     def start_action_scan_callback(self, msg):
         if msg.data:
@@ -358,8 +367,11 @@ class Vision(Node):
         # log the entire color tensor
         self.get_logger().info(f"Color tensor: {color_tensor}")
         """
+        # take self.depth to do CLIP
+        # convert self.depth to a tensor with same shape as color_tensor
+        depth_tensor = torch.tensor(self.depth).float()
         # initialize a CLIP model
-        clip_model = CLIP(color_tensor, self)
+        clip_model = CLIP(color_tensor, depth_tensor, self)
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
