@@ -30,6 +30,7 @@ class State(Enum):
     SCANNING = auto()
     PUBLISH_OBJECTS = auto()
     ACTION_SCAN = auto()
+    FIND_TABLE = auto()
 
 
 class BoundingBox():
@@ -254,7 +255,7 @@ class Vision(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # set current state
-        self.state = State.ACTION_SCAN
+        self.state = State.FIND_TABLE
 
         # initialize color and depth images
         self.color = None
@@ -292,6 +293,10 @@ class Vision(Node):
         self.hand_action_classifier.load_model(model_path)
 
         self.table_height = 0.0
+
+        self.height_start_idx = 0
+        self.height_end_idx = 1000
+        self.table_area_threshold = 10000
     
     def start_action_scan_callback(self, msg):
         if msg.data:
@@ -408,6 +413,9 @@ class Vision(Node):
         # flip self.color
         cv2.imshow(self.window, self.color)
         cv2.waitKey(0)
+    
+    def find_largest_contour(self, height_idx):
+        pass
 
     def timer_callback(self):
         # log state
@@ -440,7 +448,19 @@ class Vision(Node):
                 # set the data
                 msg.data = int(prediction)
                 self.hand_action_pub.publish(msg)
-                
+        elif self.state == State.FIND_TABLE:
+            if self.color is None or self.depth is None or self.intrinsics is None:
+                return
+            # find the table
+            for i in range(self.height_start_idx, self.height_end_idx):
+                largest_area = self.find_largest_contour(i)
+                if largest_area > self.table_area_threshold:
+                    self.get_logger().info(f"Found table at height {i}")
+                    self.table_height = i
+                    self.state = State.SCANNING
+                    break
+            self.get_logger().info("Failed to find table")
+            self.state = State.IDLE        
 
 def main(args=None):
     """Start and spin the node."""
