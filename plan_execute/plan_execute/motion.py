@@ -63,27 +63,27 @@ class Motion(Node):
 
         # create a dictionary with pick/place targets as keys and their corresponding poses as values
         self.pick_targets = {
-            "strawberry": Point(x=0.397, y=0.275, z=0.04),
-            "banana": Point(x=0.465, y=0.0, z=0.030),
-            "eggplant": Point(x=0.465, y=0.0, z=0.032),
-            "green beans": Point(x=0.465, y=0.0, z=0.032),
+            "strawberry": Point(x=0.31522, y=-0.16148, z=0.04),
+            "banana": Point(x=0.34195, y=-0.09006, z=0.030),
+            "eggplant": Point(x=0.47602, y=-0.17042, z=0.032),
+            "green beans": Point(x=0.47661, y=-0.09025, z=0.032),
+            "orange": Point(x=0.31072, y=-0.27083, z=0.032),
+            "kiwi": Point(x=0.43449, y=-0.24832, z=0.032),
         }
 
         self.pick_widths = {
-            "apple": 0.06,
+            # "apple": 0.06,
             "banana": 0.03,
             "eggplant": 0.08,
             "green beans": 0.07,
             "strawberry": 0.04,
+            "orange": 0.06,
+            "kiwi": 0.04,
         }
 
         self.place_targets = {
-            "top left corner": Point(x=0.5, y=0.5, z=0.0),
-            "top right corner": Point(x=0.5, y=-0.5, z=0.0),
-            "middle": Point(x=0.5, y=0.0, z=0.0),
-            "bottom left corner": Point(x=0.5, y=0.5, z=0.0),
-            "bottom right corner": Point(x=0.5, y=-0.5, z=0.0),
             "basket": Point(x=0.3, y=-0.23, z=0.18),
+            "chopping board": Point(x=0.39546, y=0.14105, z=0.1),
         }
     
         self.current_state = State.START
@@ -127,6 +127,7 @@ class Motion(Node):
         Callback function for the instruction subscription.
         """
         self.curr_instruction = msg.data
+        self.get_logger().info('Received instruction: %s' % self.curr_instruction)
         self.current_state = State.INTERPRET_INSTRUCTION
     
     def hand_action_callback(self, msg):
@@ -134,12 +135,14 @@ class Motion(Node):
         Callback function for the hand action subscription.
         """
         if msg.data == 0:
+            self.get_logger().info('Hand action: grabbing')
             if not self.started_cutting:
                 return
             else:
                 self.started_cutting = False
                 self.current_state = State.PICK_READY
         elif msg.data == 1:
+            self.get_logger().info('Hand action: cutting')
             self.started_cutting = True
 
     def cart_callback(self, request, response):
@@ -172,8 +175,8 @@ class Motion(Node):
         elif self.current_state == State.IDLE:
             return
         elif self.current_state == State.INTERPRET_INSTRUCTION:
+            self.get_logger().info("Interpreting instruction")
             termination_string = "done()"
-            selected_task = ""
             # break current instruction into lines
             temp_steps = self.curr_instruction.splitlines()
             # get rid of empty lines and lines that don't start with "robot", "human", or "done()"
@@ -219,7 +222,8 @@ class Motion(Node):
             pick.position.x = self.pick_targets[self.curr_pick_target].x
             pick.position.y = self.pick_targets[self.curr_pick_target].y
             # pick.position.z = self.pick_targets[self.curr_pick_target].z
-            pick.position.z = 0.028
+            # pick.position.z = 0.028
+            pick.position.z = 0.07
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=pick,
                                                                              v=0.5,
@@ -254,7 +258,7 @@ class Motion(Node):
             place.position.x = self.place_targets[self.curr_place_target].x
             place.position.y = self.place_targets[self.curr_place_target].y
             # place.position.z = self.place_targets[self.curr_place_target].z
-            place.position.z = 0.18
+            place.position.z = 0.1
             self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
                                                                              end_pose=place,
                                                                              v=0.5,
@@ -291,7 +295,11 @@ class Motion(Node):
         elif self.current_state == State.HAND_DETECTION:
             msg = Bool()
             msg.data = True
-            self.hand_detection_pub.publish(msg)
+            self.start_action_scan_pub.publish(msg)
+            self.future = await self.plan_and_execute.plan_to_cartisian_pose(start_pose=None,
+                                                                             end_pose=self.home_pose,
+                                                                             v=0.5,
+                                                                             execute=True)
             self.current_state = State.IDLE
     
     async def place_plane(self):
@@ -326,6 +334,7 @@ class Motion(Node):
             self.get_logger().info('Received pose of ' + object_name + ' at ' + str(obj_pose))
         elif object_name in self.place_targets.keys():
             self.place_targets[object_name] = msg.position
+            self.get_logger().info('Received pose of ' + object_name + ' at ' + str(obj_pose))
 
 def motion_entry():
     rclpy.init()

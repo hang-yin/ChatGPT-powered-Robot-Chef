@@ -51,7 +51,7 @@ class CLIP():
     TODO: Add class docstring
     """
 
-    def __init__(self, color_image, depth_image, table_height, node):
+    def __init__(self, color_image, node):
         # CLIP related parameters
         model_id = "openai/clip-vit-base-patch32"
         self.processor = CLIPProcessor.from_pretrained(model_id)
@@ -62,8 +62,6 @@ class CLIP():
         self.window_size = 3
         self.threshold = 0.8
         self.color_img = color_image
-        self.depth_img = depth_image
-        self.table_height = table_height
         self.node = node
     
     def get_patches(self):
@@ -92,8 +90,8 @@ class CLIP():
                         big_patch[y*self.patch_size:(y+1)*self.patch_size, x*self.patch_size:(x+1)*self.patch_size, :] = patch_batch[y, x].permute(1, 2, 0)
                 
                 # if the mean of corresponding depth patch is greater than the table height, skip the patch
-                if self.depth_img.data[Y:Y+self.window_size, X:X+self.window_size].mean() > self.table_height+0.001:
-                    continue
+                # if self.depth_img.data[Y:Y+self.window_size, X:X+self.window_size].mean() > self.table_height:
+                    # continue
 
                 inputs = self.processor(
                     images=big_patch, # image trasmitted to the model
@@ -164,7 +162,7 @@ class CLIP():
         return boxes
 
 class HandActionPrediction():
-    def __init__(self):
+    def __init__(self, node):
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
         self.mp_hands = mp.solutions.hands
@@ -176,26 +174,43 @@ class HandActionPrediction():
         self.sequence = []
         self.predictions = []
         self.actions = ['grabbing', 'cutting']
+        self.cutting_threshold = 0.47
+        self.node = node
     
     def load_model(self, model_path):
         self.model = load_model(model_path)
 
-    def prob_viz(self, res, actions, input_frame, colors):
+    def prob_viz(self, prediction, actions, input_frame, colors):
         output_frame = input_frame.copy()
-        for num, prob in enumerate(res):
-            if (prob > 0.5):
-                cv2.rectangle(output_frame, (0,60+num*40), (150, 90+num*40), colors[num], -1)
-            else:
-                cv2.rectangle(output_frame, (0,60+num*40), (0, 90+num*40), colors[num], -1)
-            cv2.putText(output_frame, actions[num], (0, 85+num*40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+        num = 0
+        if (prediction == 0):
+            cv2.rectangle(output_frame, (0,60+num*40), (150, 90+num*40), colors[num], -1)
+        else:
+            cv2.rectangle(output_frame, (0,60+num*40), (0, 90+num*40), colors[num], -1)
+        cv2.putText(output_frame, actions[num], (0, 85+num*40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+        num = 1
+        if (prediction == 1):
+            cv2.rectangle(output_frame, (0,60+num*40), (150, 90+num*40), colors[num], -1)
+        else:
+            cv2.rectangle(output_frame, (0,60+num*40), (0, 90+num*40), colors[num], -1)
+        cv2.putText(output_frame, actions[num], (0, 85+num*40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
         return output_frame
     
     def predict(self, frame):
+        frame = np.asanyarray(frame)
+        frame = cv2.cvtColor(cv2.flip(frame, 1), cv2.COLOR_BGR2RGB)
+        frame.flags.writeable = False
+        results = self.hands.process(frame)
+        frame.flags.writeable = True
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        image = frame
+        """
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image.flags.writeable = False
         results = self.hands.process(image)
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        """
         hand_result = results.multi_hand_landmarks
         if hand_result:
             result_np_array = np.zeros((1,63))
@@ -207,12 +222,19 @@ class HandActionPrediction():
                                                self.mp_hands.HAND_CONNECTIONS,
                                                self.mp_drawing.DrawingSpec(color=(121,22,76), thickness=2, circle_radius=4), 
                                                self.mp_drawing.DrawingSpec(color=(121,44,250), thickness=2, circle_radius=2))
+            # print result_np_array
+            self.node.get_logger().info(f'Landmarks: {result_np_array}')
             self.sequence.append(result_np_array)
             self.sequence = self.sequence[-self.sequence_length:]
             if len(self.sequence) == self.sequence_length:
                 res = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
-                self.predictions.append(np.argmax(res))
-                image = self.prob_viz(res, self.actions, image, self.colors)
+                self.node.get_logger().info(f'Predictions: {res}')
+                if res[1] > self.cutting_threshold:
+                    self.predictions.append(1)
+                else:
+                    self.predictions.append(0)
+                # self.predictions.append(np.argmax(res))
+                image = self.prob_viz(self.predictions[-1], self.actions, image, self.colors)
             
             # Show to screen
             cv2.namedWindow('Hand Action', cv2.WINDOW_AUTOSIZE)
@@ -255,11 +277,12 @@ class Vision(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # set current state
-        self.state = State.FIND_TABLE
+        self.state = State.ACTION_SCAN
 
         # initialize color and depth images
         self.color = None
         self.depth = None
+        self.hand_action_color = None
 
         # initialize intrinsics
         self.intrinsics = None
@@ -268,9 +291,11 @@ class Vision(Node):
 
         # self.prompts = ["eggplant", "carrot", "apple", "yellow pepper"]
         # self.prompts = ["carrot", "green beans", "yellow pepper"]
-        self.prompts = ["banana", "eggplant", "strawberry", "green beans"]
+        # self.prompts = ["banana", "eggplant", "strawberry", "green beans"]
         # self.prompts = ["banana", "strawberry"]
         # self.prompts = ["carrot"]
+        # self.prompts = ["chopping board", "yellow pepper", "orange", "kiwi", "green beans", "strawberry", "eggplant", "banana"]
+        self.prompts = ["chopping board", "orange", "kiwi", "green beans", "strawberry", "eggplant", "banana"]
 
         self.object_frame = TransformStamped()
         self.object_frame.header.frame_id = 'camera_link'
@@ -287,16 +312,16 @@ class Vision(Node):
         # 0 indicates grabbing, 1 indicates cutting
         self.hand_action_pub = self.create_publisher(Int64, '/hand_action', 10)
 
-        self.hand_action_classifier = HandActionPrediction()
+        self.hand_action_classifier = HandActionPrediction(self)
 
         model_path = get_package_share_path('camera') / 'hand_activity_model.h5'
         self.hand_action_classifier.load_model(model_path)
 
-        self.table_height = 0.0
+        self.table_height = 510.0
 
-        self.height_start_idx = 0
-        self.height_end_idx = 1000
-        self.table_area_threshold = 10000
+        # self.height_start_idx = 20
+        # self.height_end_idx = 600
+        # self.table_area_threshold = 10000
     
     def start_action_scan_callback(self, msg):
         if msg.data:
@@ -331,6 +356,7 @@ class Vision(Node):
             self.color = self.bridge.imgmsg_to_cv2(color, "bgr8")
             # flip image
             self.color = cv2.flip(self.color, 0)
+            self.hand_action_color = self.bridge.imgmsg_to_cv2(color, desired_encoding='bgr8')
         except CvBridgeError:
             self.get_logger().info("Getting color image failed?")
             return
@@ -374,9 +400,10 @@ class Vision(Node):
         """
         # take self.depth to do CLIP
         # convert self.depth to a tensor with same shape as color_tensor
-        depth_tensor = torch.tensor(self.depth).float()
+        # depth_tensor = torch.tensor(self.depth).unsqueeze(0).float()
         # initialize a CLIP model
-        clip_model = CLIP(color_tensor, depth_tensor, self)
+        # clip_model = CLIP(color_tensor, depth_tensor, self)
+        clip_model = CLIP(color_tensor, self)
         # declare prompts
         # prompts = ["a fry pan", "a carrot", "an eggplant"]# , "a computer mouse"] , "a keyboard", "a balloon"]
         # prompts = ["green beans", "a carrot", "an eggplant", "a banana", "an apple", "corn", "a yellow pepper"]
@@ -414,12 +441,75 @@ class Vision(Node):
         cv2.imshow(self.window, self.color)
         cv2.waitKey(0)
     
+    """
     def find_largest_contour(self, height_idx):
-        pass
+        depth_cpy = np.array(self.depth)
+        # Only keep stuff that's within the appropriate depth band.
+        depth_mask = cv2.inRange(np.array(depth_cpy),height_idx,height_idx + 20)
+        # This operation helps to remove "dots" on the depth image.
+        # Kernel higher dimensional = smoother. It's also less important if camera is farther away.
+        # depth_mask = cv2.morphologyEx(depth_mask, cv2.MORPH_CLOSE, self.kernel)
+        # All 0s, useful for following bitwise operations.
+        # bounding_mask = np.zeros((self.intrinsics.height, self.intrinsics.width), np.int8)
+        # Creating a square over the area defined in self.rect
+        # square = cv2.fillPoly(bounding_mask, [self.rect], 255)
+        # Blacking out everything that is not within square
+        # square = cv2.inRange(square, 1, 255)
+        # Cropping the depth_mask so that only what is within the square remains.
+        # depth_mask = cv2.bitwise_and(depth_mask, depth_mask) # , mask=square)
+        # Find the contours of this cropped mask to help locate tower.
+        contours, _ = cv2.findContours(depth_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        centroids, areas, large_contours = [], [], []
+        for c in contours:
+            M = cv2.moments(c)
+            area = cv2.contourArea(c)
+            try:
+                cx = int(M['m10']/M['m00'])
+                cy = int(M['m01']/M['m00'])
+                centroid = (cx, cy)
+                if area > 100:
+                    centroids.append(centroid)
+                    areas.append(area)
+                    large_contours.append(c)
+            except ZeroDivisionError:
+                pass
+        largest_area, centroid_pose, = None, None
+        max_centroid, box, box_area = None, None, None
+        if len(areas) != 0:
+            # There is something large in the image.
+            largest_index = np.argmax(areas)
+            largest_area = areas[largest_index]
+            # self.get_logger().info(f"LARGEST AREA: {largest_area}")
+            max_centroid = centroids[largest_index]
+            max_contour = large_contours[largest_index]
+            centroid_depth = depth_cpy[max_centroid[1]][max_centroid[0]]
+            centroid_deprojected = rs2.rs2_deproject_pixel_to_point(self.intrinsics,
+                                                                    [max_centroid[0],
+                                                                     max_centroid[1]],
+                                                                    centroid_depth)
+            centroid_pose = Pose()
+            centroid_pose.position.x = centroid_deprojected[0]/1000.
+            centroid_pose.position.y = centroid_deprojected[1]/1000.
+            centroid_pose.position.z = centroid_deprojected[2]/1000.
 
+            min_rect = cv2.minAreaRect(max_contour)
+            box = cv2.boxPoints(min_rect)
+            box = np.intp(box)
+            # Save original box area to test if the contour is a good fit
+            box_area = dist(box[0], box[1])*dist(box[1], box[2])
+
+        drawn_contours = cv2.drawContours(self.color, large_contours, -1, (0, 255, 0), 3)
+        if max_centroid is not None:
+            drawn_contours = cv2.circle(drawn_contours, max_centroid, 5, (0, 0, 255), 5)
+            drawn_contours = cv2.drawContours(drawn_contours, [box], 0, (255, 0, 0), 3)
+
+        cv2.imshow(self.window, drawn_contours)
+        cv2.waitKey(1)
+        return largest_area
+    """
     def timer_callback(self):
         # log state
-        self.get_logger().info(f"State: {self.state}")
+        # self.get_logger().info(f"State: {self.state}")
         if self.state == State.IDLE:
             """
             for obj in self.detected_objects:
@@ -440,7 +530,9 @@ class Vision(Node):
         elif self.state == State.ACTION_SCAN:
             if self.color is None or self.depth is None or self.intrinsics is None:
                 return
-            prediction = self.hand_action_classifier.predict(self.color)
+            prediction = self.hand_action_classifier.predict(self.hand_action_color)
+            self.get_logger().info(f"Prediction: {prediction}")
+            """
             if prediction is not None:
                 # self.get_logger().info(f"Prediction: {prediction}")
                 # initialize a Int64 message
@@ -448,19 +540,30 @@ class Vision(Node):
                 # set the data
                 msg.data = int(prediction)
                 self.hand_action_pub.publish(msg)
+                if prediction == 0:
+                    self.get_logger().info("Hand action: grabbing")
+                else:
+                    self.get_logger().info("Hand action: cutting")
+            """
+        """
         elif self.state == State.FIND_TABLE:
             if self.color is None or self.depth is None or self.intrinsics is None:
                 return
             # find the table
             for i in range(self.height_start_idx, self.height_end_idx):
+                self.get_logger().info(f"Scanning at height {i}")
                 largest_area = self.find_largest_contour(i)
+                self.get_logger().info(f"Area: {largest_area}")
+                if largest_area is None:
+                    continue
                 if largest_area > self.table_area_threshold:
                     self.get_logger().info(f"Found table at height {i}")
                     self.table_height = i
                     self.state = State.SCANNING
                     break
             self.get_logger().info("Failed to find table")
-            self.state = State.IDLE        
+            self.state = State.IDLE   
+        """     
 
 def main(args=None):
     """Start and spin the node."""

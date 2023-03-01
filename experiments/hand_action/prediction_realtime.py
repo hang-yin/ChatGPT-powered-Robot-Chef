@@ -91,7 +91,7 @@ def main():
                                             mp_hands.HAND_CONNECTIONS,
                                             mp_drawing.DrawingSpec(color=(121,22,76), thickness=2, circle_radius=4), 
                                             mp_drawing.DrawingSpec(color=(121,44,250), thickness=2, circle_radius=2))
-            
+            print(result_np_array)
             sequence.append(result_np_array)
             sequence = sequence[-sequence_length:]
             if len(sequence) == sequence_length:

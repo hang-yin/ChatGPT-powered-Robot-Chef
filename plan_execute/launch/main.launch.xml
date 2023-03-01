@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="plan_execute" exec="motion" name="motion_node"/>
+    <include file="$(find-pkg-share camera)/vision.launch.py"/>
+    <node pkg="flask_ros" exec="flask" name="flask_ros_node"/>
+</launch>
