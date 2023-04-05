@@ -3,7 +3,8 @@
 This project is a system that enables voice-controlled, robot-assisted cooking. The system utilizes a custom Alexa skill to process user voice commands and a Flask app to generate recipe steps through ChatGPT. Object detection using a RealSense camera and the CLIP model allows the system to recognize objects in the kitchen and adjust recipe steps accordingly. The robot arm executes the steps autonomously, while a hand-action recognition model based on MediaPipe provides the necessary feedback to ensure collaboration between human and robot in completing the cooking tasks. This system contributes to home automation technology and showcases the integration of machine learning, computer vision, and robotics in real-world applications.
 
 ## Video Demo
-<iframe width="560" height="315" src="https://www.youtube.com/embed/k3ZFFC9DcEY" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+https://user-images.githubusercontent.com/60046203/230218062-5e87c0ad-bf04-43af-933a-aebbcbe64365.mp4
 
 ## System Architecture
 
@@ -62,7 +63,7 @@ For more complex recipes that require human collaboration, our system needs to b
 
 The below video demonstrates the hand action recognition model in action.
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/L3d_Eli7Jmc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+https://user-images.githubusercontent.com/60046203/230218156-15704bfb-d69c-4ba7-8ed8-bcd6713d2da4.mp4
 
 ## Motion Module
 
