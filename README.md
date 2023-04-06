@@ -24,8 +24,6 @@ To process the user's intent and generate the recipe steps, the Flask app uses C
 
 During the development of the system, I evaluated several language models, including GPT-3 engines from OpenAI such as Ada 001, Davinci 001, and Davinci 003. We implemented a comparison test that utilized a simulated pick and place example code from the open-source [SayCan project](https://github.com/google-research/google-research/tree/master/saycan). The test involved building a collection of options based on the items available in the kitchen and then feeding them into the different language models to obtain scores via text completion. The highest-scoring action was then selected and added to the current context, with the process repeating until the recipe was complete. While the GPT-3 engines worked well for simple recipes, they struggled to handle more complicated recipes, particularly those that required human action. After comparing the results of each engine, we found that ChatGPT outperformed the others, particularly on more complex recipes. A comparison chart between all the engines and the result from ChatGPT is included below, highlighting the superiority of ChatGPT in handling complex recipe instructions.
 
-![Engine comparison]({{ site.url }}{{ site.baseurl }}/assets/images/engine-comparison.png)
-
 
 | Language Engine | Recipe | Response |
 |-----------------|--------|----------|
