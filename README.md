@@ -67,6 +67,31 @@ https://user-images.githubusercontent.com/60046203/230218156-15704bfb-d69c-4ba7-
 
 The motion module of the system is built on top of a custom Python MoveIt API that my team and I built for controlling the Franka Emika Panda robot arm in a [previous project](https://hang-yin.github.io/portfolio/portfolio/jenga/). The API provides an interface to control the robot arm with a simple Python script by specifying Cartesian positions. In this current project, I used the same API to control the robot arm to perform the various actions required in the recipe. For example, given the position of an ingredient, the API can move the end effector of the robot arm to that position and perform the appropriate action, such as picking up or placing the ingredient. The API also provides collision detection and avoidance capabilities, ensuring the robot arm does not collide with any other objects in the workspace. By building on top of this existing API, I was able to rapidly prototype the motion module of the system and focus on the integration with the other modules.
 
+## Usage Instruction
+### Franka Emika Panda arm setup
+- Plug into the Franka and the realsense camera.
+- Log into station `ssh student@station`
+- In the station, run `ros2 launch franka_moveit_config moveit.launch.py use_rviz:=false robot_ip:=panda0.robot`
+- On your laptop, run `ros2 launch franka_moveit_config rviz.launch.py robot_ip:=panda0.robot`
+- From the workspace containing these packages, run `ros2 run plan_execute main.launch.xml`
+
+### Alexa and ChatGPT setup
+- Run `chatgpt install` to make sure that your ChatGPT wrapper is working properly
+- Run `ngrok http 5000` so that the Alexa custom skill can access our web server via the generated URL
+- In Alexa developer console: 
+  - Create a custom skill
+  - Within this skill, create a user intent called "InstructionIntent" with a slot type called "food"
+  - For this intent, some example utterences can be: "help me cook {food}", "help me prepare {food}"
+  - Click `build model`
+  - In the `code` section, copy and paste the file `lambda_function.py` in the `alexa` folder
+  - The only thing you need to change in this file is the url in the `handle` method within the `InstructionIntentHandler` class; simply copy and paste the generated URL from ngrok
+  - Then, click `Deploy`
+- Once you finish setting up the Alexa custom skill, you can either:
+  - Talk to your Alexa (signed in with the same Amazon account as your Alexa developer console)
+    - `Alexa, open {robot kitchen assistant}` (you can change this by modifying the invocation name for your custom skill)
+    - `Help me cook {some type of food}`
+  - You can also open up the `Test` section on your Alexa developer console and type your voice commands 
+
 ## Reference
  - Ahn, M., Brohan, A., Brown, N., Chebotar, Y., Cortes, O., David, B., Finn, C., Fu, C., Gopalakrishnan, K., Hausman, K., Herzog, A., Ho, D., Hsu, J., Ibarz, J., Ichter, B., Irpan, A., Jang, E., Ruano, R. J., Jeffrey, K., … Zeng, A. (2022). Do As I Can, Not As I Say: Grounding Language in Robotic Affordances. arXiv. [https://doi.org/10.48550/ARXIV.2204.01691](https://doi.org/10.48550/ARXIV.2204.01691)
  - Lugaresi, C., Tang, J., Nash, H., McClanahan, C., Uboweja, E., Hays, M., Zhang, F., Chang, C.-L., Yong, M. G., Lee, J., Chang, W.-T., Hua, W., Georg, M., & Grundmann, M. (2019). MediaPipe: A Framework for Building Perception Pipelines. arXiv. [https://doi.org/10.48550/ARXIV.1906.08172](https://doi.org/10.48550/ARXIV.1906.08172)
