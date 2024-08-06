@@ -1,4 +1,4 @@
-# ChatGPT-powered Robot Chef
+# Voice-controlled Robot Chef
 
 This project is a system that enables voice-controlled, robot-assisted cooking. The system utilizes a custom Alexa skill to process user voice commands and a Flask app to generate recipe steps through ChatGPT. Object detection using a RealSense camera and the CLIP model allows the system to recognize objects in the kitchen and adjust recipe steps accordingly. The robot arm executes the steps autonomously, while a hand-action recognition model based on MediaPipe provides the necessary feedback to ensure collaboration between human and robot in completing the cooking tasks. This system contributes to home automation technology and showcases the integration of machine learning, computer vision, and robotics in real-world applications.
 
